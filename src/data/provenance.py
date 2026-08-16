@@ -90,3 +90,23 @@ def evaluate_temporal_eligibility(summary: dict, criteria: dict) -> dict:
         "checks": checks,
         "failed_checks": [name for name, passed in checks.items() if not passed],
     }
+
+
+def verify_continuity_evidence(summary: dict, expected: dict) -> dict:
+    """Verify tracked station evidence before producing derived artifacts."""
+    if int(summary["observations"]) != int(expected["observations"]):
+        raise ValueError(
+            f'Observation count mismatch: expected {expected["observations"]}, '
+            f'got {summary["observations"]}'
+        )
+    for field in ("completeness_fraction", "max_gap_steps"):
+        if not np.isclose(float(summary[field]), float(expected[field]), rtol=0.0, atol=1e-12):
+            raise ValueError(
+                f'{field} mismatch: expected {expected[field]}, got {summary[field]}'
+            )
+    return {
+        "verified": True,
+        "observations": int(summary["observations"]),
+        "completeness_fraction": float(summary["completeness_fraction"]),
+        "max_gap_steps": float(summary["max_gap_steps"]),
+    }

@@ -82,12 +82,16 @@ model performance:
 ```bash
 python scripts/select_ghcn_candidates.py
 python scripts/audit_ghcn_candidates.py --require-complete
+python scripts/prepare_ghcn_panel.py
 ```
 
 The five frozen stations, raw archive hashes, fixed period, quality controls,
 and observed eligibility evidence are tracked in
 `configs/datasets/ghcn_frozen.yaml`. The separate `ghcn_example.yaml` remains a
 negative engineering example and is not a paper dataset.
+The preparation command creates one checksum-locked `.npz` artifact per region
+and a manifest under `results/dataset_audits/`; both are generated evidence and
+are intentionally excluded from Git.
 
 For reliability experiments, prepare an `.npz` split containing `x_train`, `y_train`, `x_val`, `y_val`, `x_cal`, `y_cal`, `x_test`, and `y_test`, then run:
 

@@ -7,6 +7,7 @@ from src.data.provenance import (
     evaluate_temporal_eligibility,
     fixed_window_continuity_summary,
     temporal_continuity_summary,
+    verify_continuity_evidence,
 )
 
 
@@ -54,3 +55,10 @@ def test_temporal_summary_rejects_unsorted_or_duplicate_dates():
         temporal_continuity_summary(pd.to_datetime(["2020-01-02","2020-01-01"]),"1D")
     with pytest.raises(ValueError,match="sorted and unique"):
         temporal_continuity_summary(pd.to_datetime(["2020-01-01","2020-01-01"]),"1D")
+
+
+def test_continuity_evidence_fails_closed_on_preparation_drift():
+    summary={"observations":10,"completeness_fraction":0.9,"max_gap_steps":2.0}
+    expected={"observations":10,"completeness_fraction":0.9,"max_gap_steps":1.0}
+    with pytest.raises(ValueError,match="max_gap_steps mismatch"):
+        verify_continuity_evidence(summary,expected)

@@ -62,12 +62,15 @@ The multi-region selection can be reproduced with:
 ```bash
 python scripts/select_ghcn_candidates.py
 python scripts/audit_ghcn_candidates.py --require-complete
+python scripts/prepare_ghcn_panel.py
 ```
 
 The inventory snapshot used for v1 has SHA-256
 `adecaf2efa1ca024835b293607ecc69139931e74d3b80364f8e5f01afdd32e44`.
 Audit JSON files and raw station archives are generated locally and ignored by
-Git; the compact frozen configuration is tracked.
+Git; the compact frozen configuration is tracked. Prepared artifacts retain
+dates, TMAX, TMIN, the derived target, raw/config/code hashes, and are verified
+against the tracked continuity evidence before they are written.
 
 ### MPI-BGC Jena Beutenberg weather station
 Scientific role: high-frequency multivariate forecasting under a very different sampling regime.

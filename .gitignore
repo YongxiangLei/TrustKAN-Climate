@@ -16,6 +16,7 @@ results/tables/
 results/runs/
 results/statistical_tests/
 results/dataset_audits/
+results/prepared/
 checkpoints/
 model/
 *.pth

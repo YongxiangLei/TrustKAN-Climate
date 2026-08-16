@@ -17,6 +17,18 @@ def test_cet_benchmark_file_entrypoint_can_import_project():
     assert "--resume" in result.stdout
 
 
+def test_ghcn_preparation_file_entrypoint_can_import_project():
+    result = subprocess.run(
+        [sys.executable, "scripts/prepare_ghcn_panel.py", "--help"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "--config" in result.stdout
+    assert "--manifest" in result.stdout
+
+
 def test_code_fingerprint_is_independent_of_working_directory(tmp_path):
     root = Path(__file__).resolve().parents[1]
     scripts = root / "scripts"
