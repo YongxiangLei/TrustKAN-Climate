@@ -15,58 +15,50 @@ Move beyond point-forecast accuracy by jointly studying:
 - selective forecasting / abstention,
 - robustness and computational efficiency.
 
-## Proposed evidence chain
+## Evidence chain
 
-Climate data → Temporal KAN → intrinsic interpretability → conformal uncertainty → drift/OOD awareness → reliability score → selective forecasting → trustworthy decision support.
+Climate data → Temporal KAN → intrinsic interpretability → quantile forecasts → conformal calibration → drift/OOD awareness → reliability fusion → selective forecasting → trustworthy decision support.
 
-## Phase 1 status
+## Current model families
 
-The repository now includes:
+Persistence, SVR, Random Forest, XGBoost, MLP, LSTM, GRU, TCN, Transformer, optional Mamba, standard KAN, Tem2-KAN reference, and TrustKAN.
 
-- leakage-safe chronological train/validation/calibration/test utilities,
-- training-only normalization,
-- multi-horizon CET benchmark configuration,
-- Persistence, MLP, LSTM, GRU, Transformer and plain KAN baselines,
-- initial TrustKAN temporal model,
-- conformal interval utilities,
-- selective-risk metrics,
-- reproducibility/unit tests,
-- publication experiment and claim-evidence plans.
+## Current dataset strategy
 
-The benchmark reports final MAE/RMSE in the original temperature units after inverse scaling.
+- CET: long historical temperature continuity benchmark.
+- GHCN-Daily: independent station/network generalization.
+- Jena: high-frequency multivariate station weather.
+- ERA5: multivariate reanalysis / shift experiments.
 
-## Quick start
+Dataset inclusion, provenance, licensing and anti-cherry-picking rules are defined in `docs/DATASET_PROTOCOL.md`.
+
+## TrustKAN modules
+
+- `src/models/trustkan.py`: temporal KAN point + quantile model.
+- `src/training/trust_engine.py`: joint MSE + pinball training.
+- `src/uncertainty/conformal.py`: split-conformal calibration.
+- `src/drift/scores.py`: representation/residual shift scores.
+- `src/interpretability/stability.py`: explanation stability metrics.
+- `src/reliability/fusion.py`: reliability fusion and calibration-only threshold selection.
+- `scripts/run_trustkan_reliability.py`: end-to-end trust experiment on prepared splits.
+
+## Quick checks
 
 ```bash
 pip install -r requirements.txt
 pytest -q
-python scripts/run_cet_benchmark.py --config configs/cet.yaml
+python scripts/run_cet_benchmark.py --config configs/cet_smoke.yaml
+python scripts/aggregate_results.py
 ```
 
-The CET runner caches the existing public CET CSV from the earlier research repository into `data/raw/`. Raw data and generated experimental outputs are excluded from git by default.
+For reliability experiments, prepare an `.npz` split containing `x_train`, `y_train`, `x_val`, `y_val`, `x_cal`, `y_cal`, `x_test`, and `y_test`, then run:
 
-## Planned datasets
-
-- Central England Temperature (CET)
-- additional public climate/weather datasets with documented provenance and frozen evaluation protocols
-
-## Planned baselines
-
-Persistence, ARIMA/SARIMA, SVR, XGBoost, MLP, LSTM, GRU, TCN, Transformer, Mamba, standard KAN, Tem2-KAN, and TrustKAN.
-
-## Project structure
-
-- `docs/` research plan, experiment matrix, claim-evidence matrix and Codex task roadmap
-- `configs/` dataset/model configurations
-- `src/data/` temporal split and preprocessing utilities
-- `src/models/` baseline KAN, modern baselines and TrustKAN
-- `src/uncertainty/` conformal calibration
-- `src/metrics/` forecasting and selective-risk metrics
-- `src/training/` reproducible PyTorch engine
-- `scripts/` experiment entry points
-- `tests/` leakage and model/unit tests
-- `results/` machine-readable experiment outputs
+```bash
+python scripts/run_trustkan_reliability.py \
+  --split-file path/to/splits.npz \
+  --out results/reliability/trustkan.json
+```
 
 ## Reproducibility principles
 
-All reported values must be generated from saved experiment outputs. No manually invented numbers, hidden failed runs, or test-set leakage are allowed. Main comparisons should use multiple random seeds and fair tuning effort. CET-only evidence must not be generalized to broad climate forecasting claims until additional datasets have been evaluated.
+All reported values must be generated from saved experiment outputs. No manually invented numbers, hidden failed runs, post-hoc dataset removal, or test-set leakage are allowed. Main neural comparisons should use multiple random seeds and fair tuning effort. Thresholds, fusion weights and calibration choices must be determined without inspecting final test outcomes.
