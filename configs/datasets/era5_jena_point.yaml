@@ -1,0 +1,17 @@
+dataset:
+  key: era5
+  product: reanalysis-era5-single-levels-timeseries
+  prepared_path: data/processed/era5_jena_point.csv
+  latitude: 50.91
+  longitude: 11.56
+  variables:
+    - 2m_temperature
+  temporal_resolution: hourly
+  target_column: 2m_temperature
+window:
+  history: 168
+  horizons: [1, 6, 24, 72]
+split:
+  train: 0.60
+  validation: 0.15
+  calibration: 0.10
