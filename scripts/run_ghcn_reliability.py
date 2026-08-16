@@ -32,7 +32,7 @@ from src.reliability.evaluation import (
     evaluate_calibrated_reliability,
     inverse_standardized,
 )
-from src.training.engine import set_seed
+from src.training.engine import resolve_device, set_seed
 from src.training.trust_engine import predict_trustkan, train_trustkan
 
 
@@ -240,7 +240,9 @@ def record_from_metrics(row, metrics, calibration_state):
     )
 
 
-def run_spec(cfg, spec, horizon, paths, hashes, resume, *, selected_seeds=None):
+def run_spec(
+    cfg, spec, horizon, paths, hashes, resume, *, selected_seeds=None, device=None
+):
     raw_dir, record_dir = paths
     cfg_hash, source_hash, panel_hash = hashes
     data_hash = dataset_sha256(spec, panel_hash)
@@ -252,6 +254,12 @@ def run_spec(cfg, spec, horizon, paths, hashes, resume, *, selected_seeds=None):
         stem = f"{spec.dataset}_trustkan_reliability_h{horizon}_s{seed}"
         artifact = raw_dir / f"{stem}.npz"
         record = record_dir / f"{stem}.json"
+        set_seed(
+            seed,
+            deterministic=cfg["training"]["deterministic_algorithms"],
+            warn_only=cfg["training"]["deterministic_warn_only"],
+        )
+        run_environment = environment(device)
         if resume:
             completed = resumable_record(
                 record, artifact, cfg_hash, source_hash, data_hash
@@ -288,10 +296,10 @@ def run_spec(cfg, spec, horizon, paths, hashes, resume, *, selected_seeds=None):
             "artifact_sha256": None,
             "artifact_path": artifact.as_posix(),
             "record_path": record.as_posix(),
-            **environment(),
+            "requested_device": str(device),
+            **run_environment,
         }
         try:
-            set_seed(seed)
             train_loader = loader(
                 *spec.train_set, cfg["training"]["batch_size"], True
             )
@@ -325,11 +333,14 @@ def run_spec(cfg, spec, horizon, paths, hashes, resume, *, selected_seeds=None):
                 point_weight=cfg["training"]["point_weight"],
                 quantile_weight=cfg["training"]["quantile_weight"],
                 weight_decay=cfg["training"]["weight_decay"],
+                device=device,
             )
-            reference_prediction = predict_trustkan(model, reference_loader)
-            calibration_prediction = predict_trustkan(model, calibration_loader)
+            reference_prediction = predict_trustkan(model, reference_loader, device)
+            calibration_prediction = predict_trustkan(model, calibration_loader, device)
             test_prediction, inference_ms = timed_prediction(
-                lambda: predict_trustkan(model, test_loader), len(spec.test_set[0])
+                lambda: predict_trustkan(model, test_loader, device),
+                len(spec.test_set[0]),
+                device,
             )
             if not np.allclose(
                 inverse_standardized(spec.target_scaler, calibration_prediction["target"]),
@@ -395,6 +406,10 @@ def run_spec(cfg, spec, horizon, paths, hashes, resume, *, selected_seeds=None):
                 config_sha256=np.asarray(cfg_hash),
                 code_sha256=np.asarray(source_hash),
                 dataset_sha256=np.asarray(data_hash),
+                requested_device=np.asarray(str(device)),
+                environment_json=np.asarray(
+                    json.dumps(run_environment, sort_keys=True)
+                ),
             )
             row.update(
                 parameters=sum(parameter.numel() for parameter in model.parameters()),
@@ -429,12 +444,14 @@ def main(
     seeds=None,
     collect_only=False,
     defer_collection=False,
+    device=None,
 ):
     if collect_only and defer_collection:
         raise ValueError("--collect-only and --defer-collection are mutually exclusive")
     cfg = load_config(config)
     run_name = validate_reliability_config(cfg, config)
     panel_path, panel, station_series = load_station_panel(cfg)
+    resolved_device = resolve_device(device)
     validate_execution_filters(
         cfg,
         station_series,
@@ -485,6 +502,7 @@ def main(
                     (cfg_hash, source_hash, panel_hash),
                     resume,
                     selected_seeds=seeds,
+                    device=resolved_device,
                 )
             )
     if not collect_only:
@@ -544,6 +562,11 @@ if __name__ == "__main__":
         action="store_true",
         help="Write atomic run records only; use --collect-only after all shards.",
     )
+    parser.add_argument(
+        "--device",
+        default=None,
+        help="PyTorch device for TrustKAN, e.g. cpu, cuda, or cuda:0.",
+    )
     args = parser.parse_args()
     main(
         args.config,
@@ -554,4 +577,5 @@ if __name__ == "__main__":
         seeds=args.seeds,
         collect_only=args.collect_only,
         defer_collection=args.defer_collection,
+        device=args.device,
     )

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import json
 from pathlib import Path
 
 import numpy as np
@@ -107,6 +108,22 @@ def validate_artifact(row):
                     f"Artifact {path} metadata mismatch for {field}: {observed!r} != {expected!r}"
                 )
         row_fields = set(row._fields)
+        if "requested_device" in row_fields:
+            device_fields = {"requested_device", "environment_json"}
+            missing_device = device_fields - set(artifact.files)
+            if missing_device:
+                raise ValueError(
+                    f"Artifact {path} is missing device provenance: "
+                    f"{sorted(missing_device)}"
+                )
+            try:
+                saved_environment = json.loads(str(artifact["environment_json"]))
+            except json.JSONDecodeError as error:
+                raise ValueError(f"Artifact {path} has invalid environment JSON") from error
+            if str(artifact["requested_device"]) != str(row.requested_device):
+                raise ValueError(f"Artifact {path} requested-device metadata mismatch")
+            if saved_environment.get("device") != str(row.device):
+                raise ValueError(f"Artifact {path} resolved-device metadata mismatch")
         for ledger_field, artifact_field in OPTIONAL_ARTIFACT_METADATA.items():
             if ledger_field not in row_fields or pd.isna(getattr(row, ledger_field)):
                 continue

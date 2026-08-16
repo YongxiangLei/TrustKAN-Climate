@@ -38,3 +38,5 @@ def test_full_ghcn_config_keeps_publication_panel_and_seed_requirements():
     assert config["protocols"]==["within_station","leave_one_region_out"]
     assert config["window"]=={"history":30,"horizons":[1,7,30]}
     assert len(config["training"]["seeds"])==5
+    assert config["training"]["deterministic_algorithms"] is True
+    assert config["training"]["deterministic_warn_only"] is False

@@ -28,6 +28,8 @@ training:
   patience: 1
   learning_rate: 0.001
   weight_decay: 0.01
+  deterministic_algorithms: true
+  deterministic_warn_only: false
   point_weight: 1.0
   quantile_weight: 1.0
 

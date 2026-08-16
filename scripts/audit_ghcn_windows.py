@@ -103,6 +103,11 @@ def main(config_path, out):
         == {"train": 0.60, "validation": 0.15, "calibration": 0.10, "test": 0.15},
         "five_unique_seeds": len(set(cfg["training"]["seeds"])) >= 5,
         "required_baselines": required_models.issubset(cfg["models"]),
+        "strict_deterministic_training": cfg["training"].get(
+            "deterministic_algorithms"
+        )
+        is True
+        and cfg["training"].get("deterministic_warn_only") is False,
     }
     payload = {
         "experiment": run_name,

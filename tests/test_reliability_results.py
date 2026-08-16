@@ -68,6 +68,8 @@ def artifact_and_row(path, *, overlap=False, stale_curve=False, stale_mask=False
         calibration_state_json=np.asarray(
             json.dumps({"thresholds":{"fused":{"threshold":.8}}})
         ),
+        requested_device=np.asarray("cpu"),
+        environment_json=np.asarray(json.dumps({"device":"cpu"})),
         **metadata,
     )
     selected_rmse=rmse(target[mask],prediction[mask])
@@ -105,6 +107,8 @@ def artifact_and_row(path, *, overlap=False, stale_curve=False, stale_mask=False
         "dataset_sha256":"data",
         "artifact_sha256":file_sha256(path),
         "artifact_path":str(path),
+        "requested_device":"cpu",
+        "device":"cpu",
     }
 
 

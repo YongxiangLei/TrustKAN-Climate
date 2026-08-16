@@ -69,6 +69,7 @@ def test_ghcn_campaign_planner_entrypoint_can_import_project():
     expected = {
         "plan_ghcn_campaign.py": "--benchmark-config",
         "audit_ghcn_campaign.py": "--campaign",
+        "check_gpu_environment.py": "--device",
     }
     for script, option in expected.items():
         result = subprocess.run(

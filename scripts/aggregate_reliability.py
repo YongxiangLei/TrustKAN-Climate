@@ -54,6 +54,8 @@ REQUIRED = {
     "dataset_sha256",
     "artifact_sha256",
     "artifact_path",
+    "requested_device",
+    "device",
 }
 ARTIFACT_REQUIRED = {
     "target",
@@ -88,6 +90,8 @@ ARTIFACT_REQUIRED = {
     "config_sha256",
     "code_sha256",
     "dataset_sha256",
+    "requested_device",
+    "environment_json",
 }
 
 
@@ -207,12 +211,19 @@ def validate_artifact(row):
             "config_sha256": str(artifact["config_sha256"]),
             "code_sha256": str(artifact["code_sha256"]),
             "dataset_sha256": str(artifact["dataset_sha256"]),
+            "requested_device": str(artifact["requested_device"]),
         }
         for field, observed in metadata.items():
             expected = getattr(row, field)
             expected = int(expected) if field in {"horizon", "seed"} else str(expected)
             if observed != expected:
                 raise ValueError(f"Artifact {path} metadata mismatch for {field}")
+        try:
+            saved_environment = json.loads(str(artifact["environment_json"]))
+        except json.JSONDecodeError as error:
+            raise ValueError(f"Artifact {path} has invalid environment JSON") from error
+        if saved_environment.get("device") != str(row.device):
+            raise ValueError(f"Artifact {path} resolved-device metadata mismatch")
         for ledger_field, artifact_field in {
             "source_regions": "source_regions_json",
             "source_stations": "source_stations_json",

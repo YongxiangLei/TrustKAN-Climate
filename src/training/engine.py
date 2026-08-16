@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import copy
+import os
 import random
 import time
 import numpy as np
@@ -9,11 +10,41 @@ import torch
 from torch import nn
 
 
-def set_seed(seed: int):
+def resolve_device(device=None) -> torch.device:
+    """Resolve and validate an explicit or automatic PyTorch device."""
+    resolved = torch.device(
+        device if device is not None else ("cuda" if torch.cuda.is_available() else "cpu")
+    )
+    if resolved.type == "cuda":
+        if not torch.cuda.is_available():
+            raise RuntimeError(
+                f"CUDA device {resolved} was requested but this PyTorch build has no usable CUDA"
+            )
+        index = torch.cuda.current_device() if resolved.index is None else resolved.index
+        if index < 0 or index >= torch.cuda.device_count():
+            raise ValueError(
+                f"CUDA device index {index} is outside the available range "
+                f"[0, {torch.cuda.device_count() - 1}]"
+            )
+        resolved = torch.device("cuda", index)
+    return resolved
+
+
+def set_seed(seed: int, *, deterministic=True, warn_only=False):
+    """Seed all RNGs and configure deterministic CUDA kernels when requested."""
+    if not isinstance(seed, int):
+        raise TypeError("seed must be an integer")
+    os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
+    torch.use_deterministic_algorithms(
+        bool(deterministic), warn_only=bool(warn_only)
+    )
+    if torch.backends.cudnn.is_available():
+        torch.backends.cudnn.benchmark = False
+        torch.backends.cudnn.deterministic = bool(deterministic)
 
 
 def train_regressor(
@@ -28,7 +59,7 @@ def train_regressor(
     weight_decay=None,
     device=None,
 ):
-    device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = resolve_device(device)
     model = model.to(device)
     optimizer_name = optimizer_name.lower()
     if optimizer_name == "adamw":

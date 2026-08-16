@@ -159,7 +159,8 @@ python scripts/audit_ghcn_campaign.py \
 ```
 
 See `docs/GHCN_CAMPAIGN.md` for distributed execution, final collection, and
-the mandatory completion audit.
+the mandatory completion audit. See `docs/GPU_EXECUTION.md` for CUDA preflight,
+deterministic kernels, multi-GPU routing, and out-of-memory policy.
 
 For reliability experiments, prepare an `.npz` split containing `x_train`, `y_train`, `x_val`, `y_val`, `x_cal`, `y_cal`, `x_test`, and `y_test`, then run:
 

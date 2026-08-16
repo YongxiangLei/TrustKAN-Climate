@@ -8,6 +8,8 @@ For the 1,410-run GHCN publication campaign, first generate the immutable shard
 manifest described in `docs/GHCN_CAMPAIGN.md`. Final collection must pass both
 the five-seed/five-region aggregators and the campaign audit with
 `--require-complete` before any values enter the manuscript.
+Neural publication shards must additionally pass the CUDA environment gate in
+`docs/GPU_EXECUTION.md`; CPU fallback results cannot fill GPU campaign cells.
 
 Full CET experiments write raw artifacts under `results/raw/cet_full/` and a
 run ledger to `results/aggregated/cet_full_runs.csv`. Smoke outputs are isolated

@@ -39,7 +39,7 @@ from src.experiments.ghcn import (
 )
 from src.metrics.forecast import mae, rmse
 from src.models.baselines import PersistenceForecaster
-from src.training.engine import predict, set_seed, train_regressor
+from src.training.engine import predict, resolve_device, set_seed, train_regressor
 
 
 RUN_NAME = re.compile(r"^[A-Za-z0-9._-]+$")
@@ -85,6 +85,9 @@ def validate_config(cfg, config_path):
     implied_test = 1.0 - fractions["train"] - fractions["validation"] - fractions["calibration"]
     if "test" in fractions and not np.isclose(fractions["test"], implied_test):
         raise ValueError("split.test does not match the remaining chronological fraction")
+    for field in ("deterministic_algorithms", "deterministic_warn_only"):
+        if not isinstance(cfg["training"].get(field), bool):
+            raise ValueError(f"training.{field} must be explicitly true or false")
     return run_name
 
 
@@ -278,6 +281,7 @@ def run_spec(
     *,
     selected_models=None,
     selected_seeds=None,
+    device=None,
 ):
     raw_dir, record_dir = paths
     cfg_hash, source_hash, panel_hash = hashes
@@ -293,9 +297,16 @@ def run_spec(
         if selected_models is not None and name not in selected_models:
             continue
         seeds = [-1] if name in DETERMINISTIC else cfg["training"]["seeds"]
+        execution_device = device if name in NEURAL else resolve_device("cpu")
         for seed in seeds:
             if selected_seeds is not None and seed not in selected_seeds:
                 continue
+            set_seed(
+                seed if seed >= 0 else 0,
+                deterministic=cfg["training"]["deterministic_algorithms"],
+                warn_only=cfg["training"]["deterministic_warn_only"],
+            )
+            run_environment = environment(execution_device)
             stem = f"{spec.dataset}_{name}_h{horizon}_s{seed}"
             artifact = raw_dir / f"{stem}.npz"
             record = record_dir / f"{stem}.json"
@@ -338,7 +349,8 @@ def run_spec(
                 "artifact_sha256": np.nan,
                 "artifact_path": artifact.as_posix(),
                 "record_path": record.as_posix(),
-                **environment(),
+                "requested_device": str(device),
+                **run_environment,
             }
             history = []
             model_selection = []
@@ -350,13 +362,13 @@ def run_spec(
                 if name == "persistence":
                     model = PersistenceForecaster(horizon)
                     pred_std, latency = timed_prediction(
-                        lambda: model.predict(test_x).numpy(), len(test_x)
+                        lambda: model.predict(test_x).numpy(),
+                        len(test_x),
+                        execution_device,
                     )
                     seconds = 0.0
                     params = 0
                 elif name in CLASSICAL:
-                    if seed >= 0:
-                        set_seed(seed)
                     candidates = cfg.get("model_search", {}).get(name, [{}])
                     (
                         model,
@@ -375,11 +387,10 @@ def run_spec(
                     )
                     search_seconds = time.perf_counter() - start
                     pred_std, latency = timed_prediction(
-                        lambda: model.predict(test_x), len(test_x)
+                        lambda: model.predict(test_x), len(test_x), execution_device
                     )
                     params = np.nan
                 elif name in NEURAL:
-                    set_seed(seed)
                     model = build_model(
                         name, cfg["window"]["history"], horizon, seed
                     )
@@ -397,9 +408,12 @@ def run_spec(
                         patience=cfg["training"]["patience"],
                         optimizer_name=cfg["training"].get("optimizer", "adamw"),
                         weight_decay=cfg["training"].get("weight_decay"),
+                        device=execution_device,
                     )
                     predicted, latency = timed_prediction(
-                        lambda: predict(model, test_loader), len(test_x)
+                        lambda: predict(model, test_loader, execution_device),
+                        len(test_x),
+                        execution_device,
                     )
                     pred_std, _ = predicted
                     params = sum(parameter.numel() for parameter in model.parameters())
@@ -428,6 +442,10 @@ def run_spec(
                     config_sha256=np.asarray(cfg_hash),
                     code_sha256=np.asarray(source_hash),
                     dataset_sha256=np.asarray(data_hash),
+                    requested_device=np.asarray(str(device)),
+                    environment_json=np.asarray(
+                        json.dumps(run_environment, sort_keys=True)
+                    ),
                     training_history_json=np.asarray(json.dumps(history)),
                     model_selection_json=np.asarray(json.dumps(model_selection)),
                     selected_hyperparameters_json=np.asarray(
@@ -473,12 +491,14 @@ def main(
     seeds=None,
     collect_only=False,
     defer_collection=False,
+    device=None,
 ):
     if collect_only and defer_collection:
         raise ValueError("--collect-only and --defer-collection are mutually exclusive")
     cfg = load_config(config)
     run_name = validate_config(cfg, config)
     panel_path, panel, station_series = load_station_panel(cfg)
+    resolved_device = resolve_device(device)
     validate_execution_filters(
         cfg,
         station_series,
@@ -532,6 +552,7 @@ def main(
                     resume,
                     selected_models=models,
                     selected_seeds=seeds,
+                    device=resolved_device,
                 )
             )
     if not collect_only:
@@ -565,7 +586,7 @@ def main(
     atomic_csv(summary, aggregated_dir / f"{run_name}_summary.csv")
     print(summary.to_string(index=False))
     with open(aggregated_dir / f"{run_name}_environment.json", "w", encoding="utf-8") as handle:
-        json.dump(environment(), handle, indent=2)
+        json.dump(environment(resolved_device), handle, indent=2)
     failed = [row for row in rows if row["status"] != "ok"]
     if failed:
         raise RuntimeError(
@@ -602,6 +623,11 @@ if __name__ == "__main__":
         action="store_true",
         help="Write atomic run records only; use --collect-only after all shards.",
     )
+    parser.add_argument(
+        "--device",
+        default=None,
+        help="PyTorch device for neural models, e.g. cpu, cuda, or cuda:0.",
+    )
     args = parser.parse_args()
     main(
         args.config,
@@ -613,4 +639,5 @@ if __name__ == "__main__":
         seeds=args.seeds,
         collect_only=args.collect_only,
         defer_collection=args.defer_collection,
+        device=args.device,
     )

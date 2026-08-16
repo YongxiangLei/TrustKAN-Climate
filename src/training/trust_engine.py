@@ -7,6 +7,8 @@ import numpy as np
 import torch
 from torch import nn
 
+from src.training.engine import resolve_device
+
 
 def pinball_loss(pred: torch.Tensor, target: torch.Tensor, quantiles) -> torch.Tensor:
     """Mean quantile (pinball) loss.
@@ -31,7 +33,7 @@ def train_trustkan(
     weight_decay=0.01,
     device=None,
 ):
-    device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = resolve_device(device)
     model = model.to(device)
     opt = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
     mse = nn.MSELoss()

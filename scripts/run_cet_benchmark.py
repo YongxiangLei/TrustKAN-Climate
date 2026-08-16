@@ -39,7 +39,7 @@ from src.models.classical import make_random_forest, make_svr, make_xgboost
 from src.models.kan_baseline import StandardKANForecaster
 from src.models.tem2kan import Tem2KANReference
 from src.models.trustkan import TrustKAN
-from src.training.engine import predict, set_seed, train_regressor
+from src.training.engine import predict, resolve_device, set_seed, train_regressor
 
 
 NEURAL = {"mlp", "lstm", "gru", "transformer", "tcn", "mamba", "kan", "tem2kan", "trustkan"}
@@ -101,6 +101,9 @@ def validate_config(cfg, config_path):
     implied_test = 1.0 - fractions["train"] - fractions["validation"] - fractions["calibration"]
     if "test" in fractions and not np.isclose(fractions["test"], implied_test):
         raise ValueError("split.test does not match the remaining chronological fraction")
+    for field in ("deterministic_algorithms", "deterministic_warn_only"):
+        if not isinstance(cfg["training"].get(field), bool):
+            raise ValueError(f"training.{field} must be explicitly true or false")
     return run_name
 
 
@@ -163,23 +166,43 @@ def inverse_target(scaler, values):
     return scaler.scaler.inverse_transform(values.reshape(-1, 1)).reshape(shape)
 
 
-def environment():
-    return {
+def environment(device=None):
+    resolved = resolve_device(device)
+    details = {
         "python": platform.python_version(),
         "numpy": np.__version__,
         "pandas": pd.__version__,
         "torch": torch.__version__,
-        "device": "cuda" if torch.cuda.is_available() else "cpu",
+        "device": str(resolved),
+        "cuda_available": bool(torch.cuda.is_available()),
+        "torch_cuda": torch.version.cuda,
+        "cudnn": torch.backends.cudnn.version(),
+        "deterministic_algorithms": torch.are_deterministic_algorithms_enabled(),
+        "deterministic_warn_only": torch.is_deterministic_algorithms_warn_only_enabled(),
+        "cudnn_deterministic": bool(torch.backends.cudnn.deterministic),
+        "cudnn_benchmark": bool(torch.backends.cudnn.benchmark),
     }
+    if resolved.type == "cuda":
+        properties = torch.cuda.get_device_properties(resolved)
+        details.update(
+            cuda_device_name=properties.name,
+            cuda_device_capability=".".join(
+                str(value) for value in torch.cuda.get_device_capability(resolved)
+            ),
+            cuda_total_memory_bytes=int(properties.total_memory),
+            cuda_device_count=torch.cuda.device_count(),
+        )
+    return details
 
 
-def timed_prediction(function, n_samples):
-    if torch.cuda.is_available():
-        torch.cuda.synchronize()
+def timed_prediction(function, n_samples, device=None):
+    resolved = resolve_device(device)
+    if resolved.type == "cuda":
+        torch.cuda.synchronize(resolved)
     start = time.perf_counter()
     prediction = function()
-    if torch.cuda.is_available():
-        torch.cuda.synchronize()
+    if resolved.type == "cuda":
+        torch.cuda.synchronize(resolved)
     elapsed = time.perf_counter() - start
     return prediction, elapsed * 1000.0 / max(1, n_samples)
 
@@ -302,7 +325,16 @@ def main(config, resume=False):
 
         for name in cfg["models"]:
             seeds = [-1] if name in DETERMINISTIC else cfg["training"]["seeds"]
+            execution_device = (
+                resolve_device(None) if name in NEURAL else resolve_device("cpu")
+            )
             for seed in seeds:
+                set_seed(
+                    seed if seed >= 0 else 0,
+                    deterministic=cfg["training"]["deterministic_algorithms"],
+                    warn_only=cfg["training"]["deterministic_warn_only"],
+                )
+                run_environment = environment(execution_device)
                 artifact = raw_dir / f"cet_{name}_h{horizon}_s{seed}.npz"
                 record = record_dir / f"cet_{name}_h{horizon}_s{seed}.json"
                 if resume:
@@ -331,7 +363,8 @@ def main(config, resume=False):
                     "code_sha256": source_hash,
                     "artifact_path": artifact.as_posix(),
                     "record_path": record.as_posix(),
-                    **environment(),
+                    "requested_device": "auto",
+                    **run_environment,
                 }
                 history = []
                 model_selection = []
@@ -343,13 +376,13 @@ def main(config, resume=False):
                     if name == "persistence":
                         model = PersistenceForecaster(horizon)
                         pred_std, latency = timed_prediction(
-                            lambda: model.predict(test_x).numpy(), len(test_x)
+                            lambda: model.predict(test_x).numpy(),
+                            len(test_x),
+                            execution_device,
                         )
                         seconds = 0.0
                         params = 0
                     elif name in CLASSICAL:
-                        if seed >= 0:
-                            set_seed(seed)
                         candidates = cfg.get("model_search", {}).get(name, [{}])
                         model, selected_hyperparameters, model_selection, validation_rmse, seconds = (
                             select_classical_model(
@@ -363,10 +396,13 @@ def main(config, resume=False):
                             )
                         )
                         search_seconds = time.perf_counter() - start
-                        pred_std, latency = timed_prediction(lambda: model.predict(test_x), len(test_x))
+                        pred_std, latency = timed_prediction(
+                            lambda: model.predict(test_x),
+                            len(test_x),
+                            execution_device,
+                        )
                         params = np.nan
                     elif name in NEURAL:
-                        set_seed(seed)
                         model = build_model(name, cfg["window"]["history"], horizon, seed)
                         train_loader = loader(*sets["train"], cfg["training"]["batch_size"], True)
                         val_loader = loader(*sets["val"], cfg["training"]["batch_size"])
@@ -380,8 +416,13 @@ def main(config, resume=False):
                             patience=cfg["training"]["patience"],
                             optimizer_name=cfg["training"].get("optimizer", "adamw"),
                             weight_decay=cfg["training"].get("weight_decay"),
+                            device=execution_device,
                         )
-                        predicted, latency = timed_prediction(lambda: predict(model, test_loader), len(test_x))
+                        predicted, latency = timed_prediction(
+                            lambda: predict(model, test_loader, execution_device),
+                            len(test_x),
+                            execution_device,
+                        )
                         pred_std, _ = predicted
                         params = sum(parameter.numel() for parameter in model.parameters())
                     else:
@@ -401,6 +442,10 @@ def main(config, resume=False):
                         split=np.asarray("test"),
                         config_sha256=np.asarray(cfg_hash),
                         code_sha256=np.asarray(source_hash),
+                        requested_device=np.asarray("auto"),
+                        environment_json=np.asarray(
+                            json.dumps(run_environment, sort_keys=True)
+                        ),
                         training_history_json=np.asarray(json.dumps(history)),
                         model_selection_json=np.asarray(json.dumps(model_selection)),
                         selected_hyperparameters_json=np.asarray(json.dumps(selected_hyperparameters)),

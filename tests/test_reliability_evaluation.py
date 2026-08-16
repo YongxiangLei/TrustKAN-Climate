@@ -68,6 +68,8 @@ def test_full_reliability_config_keeps_frozen_publication_requirements():
     assert config["model"]["quantiles"]==[.05,.5,.95]
     assert config["conformal"]["alpha"]==.1
     assert config["reliability"]["fusion_weights"]==[.5,.5]
+    assert config["training"]["deterministic_algorithms"] is True
+    assert config["training"]["deterministic_warn_only"] is False
 
 
 def test_reliability_config_rejects_invalid_calibration_policy():

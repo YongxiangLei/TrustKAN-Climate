@@ -25,6 +25,10 @@ baseline suite, and the frozen conformal/reliability policy. It produces:
 - `run_all.ps1`: a fail-fast sequential execution path followed by collection,
   strict aggregation, and a completion audit.
 
+The planner also separates `run_cpu.ps1`, `run_gpu.ps1`, and `collect.ps1`.
+GPU execution and the mandatory CUDA preflight are specified in
+`docs/GPU_EXECUTION.md`.
+
 ## Sharded execution
 
 Each entry under `benchmark_jobs` or `reliability_jobs` in `campaign.json` is an
@@ -79,6 +83,10 @@ Add `--require-complete` only for the final publication gate. Incomplete
 campaigns are valid progress states but cannot support manuscript claims. Any
 change to the frozen configuration or hashed runner/source code makes prior
 records stale; they are excluded rather than silently reused.
+
+For a publication campaign, neural and reliability records must report a CUDA
+device. The completion audit rejects CPU neural records even when their metrics
+and checksums are otherwise valid.
 
 ## Engineering validation
 

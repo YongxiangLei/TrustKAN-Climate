@@ -14,6 +14,8 @@ try:
 except ModuleNotFoundError:
     from scripts import _bootstrap  # noqa: F401  # module execution
 
+from scripts.check_gpu_environment import code_sha256 as preflight_code_sha256
+from scripts.run_cet_benchmark import NEURAL
 from scripts.run_ghcn_benchmark import (
     code_sha256 as benchmark_code_sha256,
     load_config,
@@ -39,7 +41,16 @@ def atomic_json(path, payload):
             temporary.unlink()
 
 
-def verify_records(record_dir, config_hash, code_hash, expected, kind):
+def verify_records(
+    record_dir,
+    config_hash,
+    code_hash,
+    expected,
+    kind,
+    *,
+    require_gpu=False,
+    gpu_models=(),
+):
     records = []
     for path in sorted(Path(record_dir).glob("*.json")):
         with open(path, "r", encoding="utf-8") as handle:
@@ -69,6 +80,11 @@ def verify_records(record_dir, config_hash, code_hash, expected, kind):
     failed = [row for row in records if row.get("status") != "ok"]
     verified = 0
     for row in successful:
+        row_requires_gpu = require_gpu or row.get("model") in gpu_models
+        if row_requires_gpu and not str(row.get("device", "")).startswith("cuda"):
+            raise ValueError(
+                f"Publication {kind} run did not execute on CUDA: {row['_record_path']}"
+            )
         artifact = Path(row["artifact_path"])
         if not artifact.is_file():
             raise ValueError(f"Missing artifact for {row['_record_path']}: {artifact}")
@@ -117,6 +133,40 @@ def verify_records(record_dir, config_hash, code_hash, expected, kind):
     }
 
 
+def verify_gpu_preflight(path, expected_device, *, required):
+    path = Path(path)
+    summary = {"path": path.as_posix(), "present": path.is_file(), "eligible": False}
+    if not path.is_file():
+        return summary
+    with open(path, "r", encoding="utf-8") as handle:
+        payload = json.load(handle)
+    resolved_device = str(payload.get("resolved_device", ""))
+    environment = payload.get("environment", {})
+    probe = payload.get("deterministic_training_probe", {})
+    checks = {
+        "current_preflight_code": payload.get("preflight_code_sha256")
+        == preflight_code_sha256(),
+        "requested_device_matches_campaign": str(payload.get("requested_device"))
+        == str(expected_device),
+        "resolved_environment_matches": environment.get("device") == resolved_device,
+        "cuda_available": environment.get("cuda_available") is True,
+        "resolved_to_cuda": resolved_device.startswith("cuda"),
+        "exact_deterministic_replay": probe.get("exact_replay") is True,
+        "eligible_flag": payload.get("eligible_for_publication_gpu_run") is True,
+    }
+    validated = all(checks.values())
+    summary.update(
+        eligible=validated,
+        resolved_device=resolved_device,
+        preflight_code_sha256=payload.get("preflight_code_sha256"),
+        checks=checks,
+    )
+    if required and not validated:
+        failed = ", ".join(name for name, passed in checks.items() if not passed)
+        raise ValueError(f"Invalid GPU preflight ({failed}): {path}")
+    return summary
+
+
 def audit_campaign(campaign_path):
     campaign_path = Path(campaign_path)
     with open(campaign_path, "r", encoding="utf-8") as handle:
@@ -150,6 +200,7 @@ def audit_campaign(campaign_path):
         inputs["benchmark_code_sha256"],
         matrix["benchmark_atomic_runs"],
         "benchmark",
+        gpu_models=NEURAL if campaign["publication_campaign"] else (),
     )
     reliability = verify_records(
         Path("results/reliability/runs") / reliability_name,
@@ -157,7 +208,17 @@ def audit_campaign(campaign_path):
         inputs["reliability_code_sha256"],
         matrix["reliability_atomic_runs"],
         "reliability",
+        require_gpu=campaign["publication_campaign"],
     )
+    preflight_required = campaign["publication_campaign"] and str(
+        campaign["execution"]["gpu_device"]
+    ).startswith("cuda")
+    gpu_preflight = verify_gpu_preflight(
+        campaign_path.parent / "gpu_environment.json",
+        campaign["execution"]["gpu_device"],
+        required=preflight_required,
+    )
+    gpu_gate = gpu_preflight["eligible"] if preflight_required else True
     return {
         "schema_version": 1,
         "audited_at_utc": datetime.now(timezone.utc).isoformat(),
@@ -167,7 +228,10 @@ def audit_campaign(campaign_path):
         "current_inputs_verified": True,
         "benchmark": benchmark,
         "reliability": reliability,
-        "campaign_complete": benchmark["complete"] and reliability["complete"],
+        "gpu_preflight": gpu_preflight,
+        "campaign_complete": benchmark["complete"]
+        and reliability["complete"]
+        and gpu_gate,
     }
 
 

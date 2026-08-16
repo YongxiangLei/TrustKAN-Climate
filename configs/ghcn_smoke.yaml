@@ -29,6 +29,8 @@ training:
   learning_rate: 0.001
   optimizer: adamw
   weight_decay: 0.01
+  deterministic_algorithms: true
+  deterministic_warn_only: false
 
 models: [persistence, svr, mlp, trustkan]
 
