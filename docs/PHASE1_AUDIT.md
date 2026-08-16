@@ -17,7 +17,7 @@ not validate scientific superiority or support any manuscript result claim.
 - Verified that the standardizer is fitted on `values[split.train]` only.
 - Verified contiguous train/validation/calibration/test slices and no shuffling
   during window construction.
-- Ran the strengthened suite after result-integrity, Tem2-KAN and statistical fixes: 46 tests passed.
+- Ran the strengthened suite after result-integrity, Tem2-KAN, statistical and GHCN fixes: 52 tests passed.
 - Ran the documented smoke benchmark end-to-end and verified that seven model
   runs produced raw prediction archives plus aggregated CSV outputs.
 
@@ -119,6 +119,20 @@ artifact comparison additionally requires identical timestamps, origins,
 dataset, split, fingerprints and matching stochastic seeds. Holm and
 Benjamini–Hochberg p-value adjustments are available for pre-specified families.
 Formal multi-seed comparisons remain pending.
+
+### P1 — GHCN loader treated the first observation as a header (fixed)
+
+The official NOAA by-station archive is a headerless eight-column gzip file.
+The previous `pandas.read_csv` call inferred its first observation as column
+names and could not satisfy the expected schema. The loader now supplies the
+official fields explicitly, preserves downloaded gzip bytes, rejects `-9999`
+sentinels and non-empty quality flags, and returns stable two-dimensional data.
+A station audit records archive SHA-256, access time, QC counts, gaps and
+pre-registered eligibility.
+
+The included `USW00094728/TAVG` example correctly fails the 30-year gate: its
+retained record spans only 1998-04-01 to 2005-07-31. It remains an engineering
+test and is prohibited from headline comparisons.
 
 ## Leakage assessment
 

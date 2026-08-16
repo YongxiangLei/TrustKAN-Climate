@@ -1,9 +1,16 @@
 dataset:
-  key: ghcn
+  key: ghcnd
   station_id: USW00094728
   element: TAVG
   temporal_resolution: daily
   target_unit: degC
+  start: 1950-01-01
+  end: 2024-12-31
+  quality_control: reject_nonempty_q_flag
+  eligibility:
+    minimum_span_years: 30
+    minimum_completeness: 0.95
+    maximum_gap_steps: 31
   selection_policy: "EXAMPLE ONLY — replace with pre-registered station selection before headline experiments"
 window:
   history: 365

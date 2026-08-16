@@ -26,6 +26,18 @@ Landing page: https://www.ncei.noaa.gov/products/land-based-station/global-histo
 Characteristics: daily station climate summaries with maximum/minimum temperature, precipitation and additional elements; NOAA reports more than 100,000 stations across 180 countries and territories on the current product page.
 Protocol still to freeze: objective station inclusion rule based on record length/completeness and fixed geographic selection. No station may be selected according to model performance.
 
+The repository's engineering example (`USW00094728`, `TAVG`, requested period
+1950--2024) was audited on 2026-08-16. The retained element spans only
+1998-04-01 through 2005-07-31 (2,643 observations) and therefore fails the
+pre-registered 30-year minimum despite 98.66% within-span completeness. It must
+not be used for headline results. This negative eligibility result is retained
+to demonstrate that dataset gates are enforced rather than bypassed.
+
+`scripts/audit_ghcn.py` preserves the official headerless gzip bytes, records a
+SHA-256 and access timestamp, parses the documented eight-column station format,
+rejects `-9999` sentinels and non-empty NOAA quality flags, quantifies calendar
+gaps, and can fail closed with `--require-eligible`.
+
 ### MPI-BGC Jena Beutenberg weather station
 Scientific role: high-frequency multivariate forecasting under a very different sampling regime.
 Authoritative source: Max Planck Institute for Biogeochemistry, Jena.
@@ -47,6 +59,7 @@ Protocol still to freeze: raw variable schema, aggregation interval, quality con
 8. forecast history and horizons;
 9. deterministic preparation script/checksum;
 10. scientific reason for inclusion.
+11. machine-readable eligibility criteria and pass/fail audit.
 
 ## Anti-cherry-picking rule
 Dataset inclusion/exclusion criteria must be fixed before headline model comparison. A dataset may not be removed because TrustKAN performs poorly; failures must be reported and analysed.
