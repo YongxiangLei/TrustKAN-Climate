@@ -16,10 +16,29 @@ def set_seed(seed: int):
     torch.cuda.manual_seed_all(seed)
 
 
-def train_regressor(model, train_loader, val_loader, *, epochs=100, lr=1e-3, patience=10, device=None):
+def train_regressor(
+    model,
+    train_loader,
+    val_loader,
+    *,
+    epochs=100,
+    lr=1e-3,
+    patience=10,
+    optimizer_name="adamw",
+    weight_decay=None,
+    device=None,
+):
     device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = model.to(device)
-    opt = torch.optim.AdamW(model.parameters(), lr=lr)
+    optimizer_name = optimizer_name.lower()
+    if optimizer_name == "adamw":
+        decay = 0.01 if weight_decay is None else weight_decay
+        opt = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=decay)
+    elif optimizer_name == "adam":
+        decay = 0.0 if weight_decay is None else weight_decay
+        opt = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=decay)
+    else:
+        raise ValueError(f"Unsupported optimizer: {optimizer_name}")
     loss_fn = nn.MSELoss()
     best = copy.deepcopy(model.state_dict())
     best_val = float("inf")

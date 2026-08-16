@@ -28,6 +28,43 @@ def test_windows_and_origins_are_temporal():
     assert origins[0] == 3
 
 
+def test_windows_crossing_calendar_gap_are_excluded():
+    values = np.arange(8)
+    dates = np.array(
+        [
+            "2020-01-01",
+            "2020-01-02",
+            "2020-01-03",
+            "2020-01-04",
+            "2020-08-26",
+            "2020-08-27",
+            "2020-08-28",
+            "2020-08-29",
+        ],
+        dtype="datetime64[D]",
+    )
+    _, _, origins = sliding_windows(
+        values,
+        history=2,
+        horizon=1,
+        timestamps=dates,
+        expected_step=np.timedelta64(1, "D"),
+    )
+    assert np.array_equal(origins, [2, 3, 6, 7])
+    assert 4 not in origins and 5 not in origins
+
+
+def test_timestamp_filter_requires_aligned_metadata():
+    with pytest.raises(ValueError, match="timestamps must align"):
+        sliding_windows(
+            np.arange(6),
+            history=2,
+            horizon=1,
+            timestamps=np.arange(5),
+            expected_step=1,
+        )
+
+
 def test_window_assignment_by_target_origin():
     split = chronological_split(20, train=0.5, val=0.2, calibration=0.1)
     _, _, origins = sliding_windows(np.arange(20), history=3, horizon=1)

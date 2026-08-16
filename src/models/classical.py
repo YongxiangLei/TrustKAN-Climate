@@ -9,9 +9,23 @@ def _flat(x):
 
 
 class DirectMultiOutputRegressor:
-    def __init__(self, estimator): self.estimator=estimator
-    def fit(self,x,y): self.estimator.fit(_flat(x),np.asarray(y)); return self
-    def predict(self,x): return self.estimator.predict(_flat(x))
+    def __init__(self, estimator, squeeze_single_output=False):
+        self.estimator=estimator
+        self.squeeze_single_output=squeeze_single_output
+        self.n_outputs_=None
+    def fit(self,x,y):
+        target=np.asarray(y)
+        if target.ndim==1: target=target[:,None]
+        self.n_outputs_=target.shape[1]
+        if self.squeeze_single_output and self.n_outputs_==1: target=target[:,0]
+        self.estimator.fit(_flat(x),target)
+        return self
+    def predict(self,x):
+        prediction=np.asarray(self.estimator.predict(_flat(x)))
+        if prediction.ndim==1: prediction=prediction[:,None]
+        if self.n_outputs_ is not None and prediction.shape[1]!=self.n_outputs_:
+            raise ValueError("Classical estimator returned an unexpected output width")
+        return prediction
 
 
 def make_svr(c=10.0,epsilon=0.1,gamma="scale"):
@@ -20,9 +34,17 @@ def make_svr(c=10.0,epsilon=0.1,gamma="scale"):
     return DirectMultiOutputRegressor(MultiOutputRegressor(SVR(C=c,epsilon=epsilon,gamma=gamma)))
 
 
-def make_random_forest(n_estimators=300,random_state=0,n_jobs=-1):
+def make_random_forest(n_estimators=300,random_state=0,n_jobs=-1,**kwargs):
     from sklearn.ensemble import RandomForestRegressor
-    return DirectMultiOutputRegressor(RandomForestRegressor(n_estimators=n_estimators,random_state=random_state,n_jobs=n_jobs))
+    return DirectMultiOutputRegressor(
+        RandomForestRegressor(
+            n_estimators=n_estimators,
+            random_state=random_state,
+            n_jobs=n_jobs,
+            **kwargs,
+        ),
+        squeeze_single_output=True,
+    )
 
 
 def make_xgboost(random_state=0,**kwargs):

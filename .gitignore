@@ -9,7 +9,12 @@ data/raw/*.csv
 results/raw/*.npz
 results/aggregated/*.csv
 results/aggregated/*.json
+results/aggregated/*_config.yaml
+results/raw/
+results/tables/
+results/runs/
 checkpoints/
+model/
 *.pth
 *.pt
 .DS_Store

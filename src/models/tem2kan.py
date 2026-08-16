@@ -17,9 +17,17 @@ class Tem2KANReference(nn.Module):
     time and feature dimensions are flattened before the KAN mapping.
     """
 
+    REFERENCE_IO = (300, 1, 20)
+
     def __init__(self, history: int, n_features: int, horizon: int,
-                 hidden=(32, 64, 32), k: int = 10, grid: int = 10):
+                 hidden=(32, 64, 32), k: int = 10, grid: int = 10,
+                 *, strict: bool = True, seed: int = 1):
         super().__init__()
+        if strict and (history, n_features, horizon) != self.REFERENCE_IO:
+            raise ValueError(
+                "Strict Tem2-KAN reproduction requires history=300, "
+                "n_features=1 and horizon=20"
+            )
         try:
             from kan import KAN
         except ImportError as exc:
@@ -28,7 +36,15 @@ class Tem2KANReference(nn.Module):
                 "Install the version documented for the reproduction environment."
             ) from exc
         width = [history * n_features, *hidden, horizon]
-        self.model = KAN(width=width, k=k, grid=grid)
+        reference_width = list(width)
+        self.model = KAN(width=width, k=k, grid=grid, seed=seed, auto_save=False)
+        self.reproduction_spec = {
+            "width": reference_width,
+            "k": k,
+            "grid": grid,
+            "seed": seed,
+            "strict": strict,
+        }
 
     def forward(self, x):
         return self.model(x.flatten(1))

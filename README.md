@@ -48,12 +48,29 @@ Dataset inclusion, provenance, licensing and anti-cherry-picking rules are defin
 pip install -r requirements.txt
 pytest -q
 python scripts/run_cet_benchmark.py --config configs/cet_smoke.yaml
-python scripts/aggregate_results.py
+python scripts/aggregate_results.py \
+  --input results/aggregated/cet_smoke_runs.csv \
+  --outdir results/tables/cet_smoke
 ```
 
 `configs/cet_smoke.yaml` intentionally uses only the latest 2,000 valid
 observations and is for engineering validation only. It must not be used for
 paper claims or benchmark tables; use `configs/cet.yaml` for full experiments.
+Smoke and full runs use separate output namespaces, so validation runs cannot
+overwrite publication candidates. Every successful run records a configuration
+hash, target timestamps, training history, per-sample inference latency and the
+path to its raw prediction artifact.
+
+Before producing paper tables, require at least five unique seeds for every
+stochastic model and validate every referenced raw artifact:
+
+```bash
+python scripts/run_cet_benchmark.py --config configs/cet.yaml --resume
+python scripts/aggregate_results.py \
+  --input results/aggregated/cet_full_runs.csv \
+  --outdir results/tables/cet_full \
+  --min-seeds 5
+```
 
 For reliability experiments, prepare an `.npz` split containing `x_train`, `y_train`, `x_val`, `y_val`, `x_cal`, `y_cal`, `x_test`, and `y_test`, then run:
 

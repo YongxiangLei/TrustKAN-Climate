@@ -17,7 +17,7 @@ not validate scientific superiority or support any manuscript result claim.
 - Verified that the standardizer is fitted on `values[split.train]` only.
 - Verified contiguous train/validation/calibration/test slices and no shuffling
   during window construction.
-- Ran the strengthened suite after fixes: 26 tests passed.
+- Ran the strengthened suite after result-integrity and Tem2-KAN fixes: 39 tests passed.
 - Ran the documented smoke benchmark end-to-end and verified that seven model
   runs produced raw prediction archives plus aggregated CSV outputs.
 
@@ -57,6 +57,58 @@ optional `dataset.max_observations`, and the smoke configuration explicitly uses
 the latest 2,000 valid observations. The README marks this subset as
 engineering-only and prohibits its use for paper claims.
 
+### P1 — Smoke and full experiments shared output names (fixed)
+
+Both configurations previously wrote the same raw filenames and CET CSV paths,
+allowing an engineering run to overwrite publication candidates. Configurations
+now declare separate `cet_smoke` and `cet_full` experiment namespaces.
+
+### P1 — Successful result rows were not linked to auditable artifacts (fixed)
+
+The run ledger now includes the test split, per-sample inference latency,
+configuration and source-code SHA-256 values, and raw artifact path. Raw artifacts include target
+timestamps, origins, run metadata and neural training history. The strict
+aggregator checks run-key uniqueness, artifact presence, metadata agreement,
+array shapes, finite values and a configurable minimum seed count.
+
+### P2 — Downloaded CET data had no integrity check (fixed)
+
+All CET configurations use an immutable source-commit URL and pin the observed
+SHA-256 of the raw CSV. Cached and newly downloaded data are rejected when the
+checksum differs.
+
+### P1 — Observation steps did not always equal calendar days (fixed)
+
+The valid Pershore series contains 14 non-daily intervals, including a maximum
+gap of 235 days. Dropping missing targets and then constructing array-indexed
+windows could therefore mislabel observation steps as day horizons. Window
+construction now accepts timestamps and excludes any history/target span whose
+increments differ from the configured daily frequency. Regression tests cover
+cross-gap exclusion and timestamp alignment.
+
+### P1 — Long runs were not interruption-resilient (fixed)
+
+Per-run metrics are now written immediately as atomic JSON records. `--resume`
+reuses only successful records with the active configuration and source-code
+hashes and an existing raw artifact. A changed config or implementation
+invalidates stale records; failed runs are retried.
+
+### P1 — Tem2-KAN identity and dependency were ambiguous (fixed in code)
+
+The public source was audited at commit
+`d4458e8fb11883b2eec0994aaaa6b7914e7f9e60`. Strict mode now enforces the verified
+300→20 univariate architecture, passes the experiment seed to pykan, disables
+automatic checkpoint side effects and pins `pykan==0.2.8`. A dedicated fair
+protocol is provided in `configs/cet_tem2kan.yaml`; full five-seed execution is
+still pending.
+
+### P1 — Classical defaults lacked a validation selection trail (fixed in code)
+
+The formal CET config now pre-declares SVR and random-forest candidate sets.
+Candidates are fit only on training windows, selected by validation RMSE, and
+their complete selection trace is saved in the raw artifact. Test targets are
+not used for selection. Full executions remain pending.
+
 ## Leakage assessment
 
 - Scaling: pass; training observations only.
@@ -77,8 +129,8 @@ claims. The run confirmed raw `.npz` prediction saving and CSV aggregation.
 
 - Leakage tests pass: **yes**.
 - CET benchmark runs end-to-end: **yes, smoke configuration only**.
-- Plain KAN, Tem2-KAN, and TrustKAN are distinct: **code paths are distinct;
-  faithful Tem2-KAN reproduction remains unverified**.
+- Plain KAN, Tem2-KAN, and TrustKAN are distinct: **yes in code; strict Tem2-KAN
+  source mapping and shape are verified, but full reproduction results remain pending**.
 - At least five seeds for main neural models: **no**.
 - Raw predictions saved: **yes for smoke; full runs pending**.
 - Reproducible aggregation: **smoke path works; schema still needs integrity

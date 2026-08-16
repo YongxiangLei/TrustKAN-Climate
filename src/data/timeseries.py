@@ -31,18 +31,36 @@ def chronological_split(n: int, train=0.60, val=0.15, calibration=0.10) -> Tempo
     return TemporalSplit(slice(0, i1), slice(i1, i2), slice(i2, i3), slice(i3, n))
 
 
-def sliding_windows(values, history: int, horizon: int):
-    """Create time-ordered history/target windows without shuffling."""
+def sliding_windows(values, history: int, horizon: int, *, timestamps=None, expected_step=None):
+    """Create time-ordered history/target windows without shuffling.
+
+    When timestamps are supplied, windows crossing an irregular time interval
+    are excluded. This preserves the physical meaning of calendar-based
+    histories and horizons after rows with missing targets have been removed.
+    """
     a = np.asarray(values, dtype=np.float32)
     if a.ndim == 1:
         a = a[:, None]
     if history <= 0 or horizon <= 0 or len(a) < history + horizon:
         raise ValueError("Invalid history/horizon for available series")
+    time = None
+    if timestamps is not None:
+        time = np.asarray(timestamps)
+        if len(time) != len(a):
+            raise ValueError("timestamps must align with values")
+        if expected_step is None:
+            raise ValueError("expected_step is required when timestamps are supplied")
     xs, ys, origins = [], [], []
     for origin in range(history, len(a) - horizon + 1):
+        if time is not None:
+            span = time[origin-history:origin+horizon]
+            if not np.all(np.diff(span) == expected_step):
+                continue
         xs.append(a[origin-history:origin])
         ys.append(a[origin:origin+horizon, 0])
         origins.append(origin)
+    if not xs:
+        raise ValueError("No valid windows remain after temporal-continuity filtering")
     return np.stack(xs), np.stack(ys), np.asarray(origins)
 
 

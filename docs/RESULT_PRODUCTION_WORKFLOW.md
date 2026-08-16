@@ -2,6 +2,38 @@
 
 This project treats manuscript tables and figures as deterministic products of saved experiment outputs.
 
+## 0. Produce and validate deterministic benchmark runs
+
+Full CET experiments write raw artifacts under `results/raw/cet_full/` and a
+run ledger to `results/aggregated/cet_full_runs.csv`. Smoke outputs are isolated
+under the `cet_smoke` namespace and are never publication candidates.
+
+```bash
+python scripts/run_cet_benchmark.py --config configs/cet.yaml --resume
+python scripts/aggregate_results.py \
+  --input results/aggregated/cet_full_runs.csv \
+  --outdir results/tables/cet_full \
+  --min-seeds 5
+```
+
+Aggregation fails if a run key is duplicated, a successful row has no raw
+artifact, artifact metadata disagrees with the ledger, arrays have inconsistent
+shapes or non-finite values, a non-test row is supplied, or a stochastic model
+has fewer than the required number of seeds. `inference_ms` is wall-clock
+latency per test sample over the complete prediction pass; GPU timing is
+synchronized before and after prediction.
+
+Each model/horizon/seed run is written immediately as an atomic JSON record
+under `results/runs/<experiment>/`. `--resume` reuses a successful record only
+when its configuration hash, source-code hash and raw artifact match the active
+experiment; failed or stale runs are executed again.
+
+Classical candidate sets are declared under `model_search` in the experiment
+configuration. Each candidate is trained on the training region and ranked by
+validation RMSE. Candidate metrics, fit times and selected hyperparameters are
+stored in both the run ledger and raw artifact; final-test targets never enter
+selection.
+
 ## 1. Train TrustKAN and create trust artifacts
 
 ```bash

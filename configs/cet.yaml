@@ -1,9 +1,14 @@
+experiment:
+  name: cet_full
+
 dataset:
   name: CET_Pershore_College
-  source: https://raw.githubusercontent.com/YongxiangLei/kan_proj/main/cet_mean_station_series.csv
+  source: https://raw.githubusercontent.com/YongxiangLei/kan_proj/d4458e8fb11883b2eec0994aaaa6b7914e7f9e60/cet_mean_station_series.csv
   date_column: date
   target_column: Pershore_College
+  frequency: 1D
   min_valid_temperature: -20.0
+  sha256: c54a9da8a66e71368ebf1dde70d8f6d8110d63bb15d39969e34568f5089048f7
 
 window:
   history: 365
@@ -21,12 +26,28 @@ training:
   epochs: 100
   patience: 10
   learning_rate: 0.001
+  optimizer: adamw
+  weight_decay: 0.01
 
 models:
   - persistence
+  - svr
+  - random_forest
   - mlp
   - lstm
   - gru
+  - tcn
   - transformer
   - kan
   - trustkan
+
+model_search:
+  svr:
+    - {c: 1.0, epsilon: 0.05, gamma: scale}
+    - {c: 10.0, epsilon: 0.05, gamma: scale}
+    - {c: 10.0, epsilon: 0.1, gamma: scale}
+    - {c: 100.0, epsilon: 0.1, gamma: scale}
+  random_forest:
+    - {n_estimators: 300, max_depth: 12, min_samples_leaf: 1}
+    - {n_estimators: 300, max_depth: 24, min_samples_leaf: 1}
+    - {n_estimators: 300, max_depth: null, min_samples_leaf: 1}
