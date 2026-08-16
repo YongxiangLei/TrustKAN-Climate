@@ -1,0 +1,13 @@
+dataset:
+  key: jena
+  prepared_path: data/processed/jena_weather.csv
+  temporal_resolution: 10min
+  target_column: "T (degC)"
+  source_manifest: data/manifests/jena_sources.csv
+window:
+  history: 144
+  horizons: [6, 36, 144]
+split:
+  train: 0.60
+  validation: 0.15
+  calibration: 0.10
