@@ -2,41 +2,122 @@
 \label{sec:method}
 
 \subsection{Problem Formulation}
-Let $\mathbf{x}_t\in\mathbb{R}^{d}$ denote the climate or weather variables observed at time $t$. Given a history window of length $L$, the forecasting task is to estimate a future target vector $\mathbf{y}_{t+1:t+H}$ over horizon $H$. We seek not only a point forecast $\hat{\mathbf{y}}$ but also a reliability characterization that supports calibrated intervals and selective use of the prediction.
+Let $\mathbf{x}_t\in\mathbb{R}^{d}$ denote the observed climate or weather variables at time $t$. Given a look-back window of length $L$, define
+\begin{equation}
+\mathbf{X}_t=[\mathbf{x}_{t-L+1},\ldots,\mathbf{x}_t]\in\mathbb{R}^{L\times d}.
+\end{equation}
+For a forecasting horizon $H$, the target is
+\begin{equation}
+\mathbf{y}_t=[y_{t+1},\ldots,y_{t+H}]^\top\in\mathbb{R}^{H}.
+\end{equation}
+The objective is to learn a predictor that produces (i) a point forecast $\hat{\mathbf{y}}_t$, (ii) predictive intervals, and (iii) a reliability score $r_t\in[0,1]$ that can be used for selective forecasting.
 
 \subsection{Temporal KAN Representation}
-The proposed model first maps the input sequence through a temporal encoder and then through a KAN-style nonlinear representation. For a hidden vector $\mathbf{z}$, the KAN mapping is represented as a sum of learnable univariate functions across input dimensions,
+The input sequence is first transformed by a temporal encoder $g_{\theta}$,
 \begin{equation}
-\mathbf{h}=\mathbf{b}(\mathbf{z})+\sum_j \boldsymbol{\phi}_j(z_j),
+\mathbf{Z}_t=g_{\theta}(\mathbf{X}_t),
 \end{equation}
-where the current implementation parameterizes $\boldsymbol{\phi}_j$ using Gaussian radial basis expansions. This design preserves inspectable nonlinear functions while allowing the temporal encoder to capture local temporal dependencies.
-
-\subsection{Point and Quantile Forecasting}
-The encoded representation is pooled to a fixed-dimensional embedding $\mathbf{e}$. A point head predicts $\hat{\mathbf{y}}$, while a quantile head predicts lower, median, and upper conditional quantiles. Training combines point mean-squared error and quantile pinball loss,
+where the current implementation uses one-dimensional temporal convolutions to capture local lag structure. Each hidden vector $\mathbf{z}\in\mathbb{R}^{m}$ is then processed by a KAN-style mapping
 \begin{equation}
-\mathcal{L}=\mathcal{L}_{\mathrm{MSE}}+\lambda_q\mathcal{L}_{\mathrm{quantile}}.
+ h_k(\mathbf{z})=b_k(\mathbf{z})+\sum_{j=1}^{m}\phi_{kj}(z_j),
+ \label{eq:kanmap}
 \end{equation}
-The weighting $\lambda_q$ is treated as a configurable hyperparameter and must be tuned using training/validation data only.
-
-\subsection{Conformal Calibration}
-Let $[\hat{\ell}_i,\hat{u}_i]$ denote the model interval for a calibration sample with target $y_i$. The nonconformity score is
+where $b_k$ denotes a learnable base mapping and $\phi_{kj}$ is a learnable univariate function. In the dependency-light implementation used in this repository, each $\phi_{kj}$ is represented by Gaussian radial basis functions,
 \begin{equation}
-s_i=\max\{\hat{\ell}_i-y_i,\; y_i-\hat{u}_i,\;0\}.
+\phi_{kj}(z)=\sum_{g=1}^{G}c_{kjg}\exp\left[-\frac{1}{2}\left(\frac{z-\mu_g}{\sigma_{jg}}\right)^2\right],
 \end{equation}
-A finite-sample conformal radius is obtained from an empirical quantile of the calibration scores and added symmetrically to the predicted interval. We compare static split conformal calibration with rolling and adaptive variants. In the sequential variants, the label for the current time step is incorporated only after its interval has been issued.
+with grid centers $\mu_g$, coefficients $c_{kjg}$, and positive scales $\sigma_{jg}$. This functional decomposition is motivated by the interpretable edge-function view of KANs \cite{liu2025kan}.
 
-\subsection{Distribution-Shift Evidence}
-The model embedding $\mathbf{e}$ is used to construct a reference distribution from calibration samples. A Mahalanobis-type distance provides one representation-shift score. This score is converted to a reliability component relative to the empirical calibration distribution. The design is deliberately modular so that representation shift can be removed in controlled ablations.
+The resulting temporal representation is pooled to obtain an embedding $\mathbf{e}_t\in\mathbb{R}^{m}$. This embedding feeds the forecasting heads and also provides a representation space for shift assessment.
+
+\subsection{Joint Point and Quantile Forecasting}
+The point head predicts
+\begin{equation}
+\hat{\mathbf{y}}_t=f_{p}(\mathbf{e}_t),
+\end{equation}
+while the quantile head predicts $\hat{q}_{t,h}^{(\tau)}$ for quantile levels $\tau\in\mathcal{T}$. For error $u=y-\hat{q}^{(\tau)}$, the pinball loss is
+\begin{equation}
+\rho_{\tau}(u)=u\left(\tau-\mathbb{I}\{u<0\}\right).
+\end{equation}
+The training objective is
+\begin{equation}
+\mathcal{L}=\frac{1}{NH}\sum_{i,h}(y_{i,h}-\hat{y}_{i,h})^2+
+\lambda_q\frac{1}{NH|\mathcal{T}|}\sum_{i,h,\tau}\rho_{\tau}\left(y_{i,h}-\hat{q}_{i,h}^{(\tau)}\right).
+\label{eq:jointloss}
+\end{equation}
+The hyperparameter $\lambda_q$ is selected using training/validation data only. Quantile outputs are constrained to be non-crossing in the current implementation by sorting along the quantile dimension.
+
+\subsection{Static Conformal Calibration}
+Let $[\hat{\ell}_{i,h},\hat{u}_{i,h}]$ denote the lower and upper model quantiles for a calibration example. Following conformalized quantile ideas \cite{romano2019cqr}, define the nonconformity score
+\begin{equation}
+s_{i,h}=\max\{\hat{\ell}_{i,h}-y_{i,h},\; y_{i,h}-\hat{u}_{i,h},\;0\}.
+\end{equation}
+The calibration scores are flattened over samples and horizons in the current implementation. With $n$ scores and target miscoverage $\alpha$, the finite-sample expansion radius is
+\begin{equation}
+\hat{q}_{1-\alpha}=Q_{\lceil(n+1)(1-\alpha)\rceil/n}\left(\{s_j\}_{j=1}^{n}\right),
+\end{equation}
+where $Q$ denotes the empirical quantile using the higher order statistic. The calibrated interval is
+\begin{equation}
+\mathcal{C}_{t,h}=[\hat{\ell}_{t,h}-\hat{q}_{1-\alpha},\;\hat{u}_{t,h}+\hat{q}_{1-\alpha}].
+\end{equation}
+Static conformal calibration is treated as a baseline rather than assumed to remain valid under arbitrary temporal shift.
+
+\subsection{Rolling and Adaptive Conformal Calibration}
+To respond to non-stationarity, we additionally evaluate sequential calibration. In rolling conformal prediction, the conformal radius at time $t$ is computed from only the most recent $W$ revealed nonconformity scores. The current target is inserted into the score buffer only after the interval for that time step has been issued, preventing label look-ahead.
+
+For Adaptive Conformal Inference (ACI) \cite{gibbs2021adaptive,zaffran2022adaptive}, let $\alpha_t$ denote the effective miscoverage level. After observing whether the issued interval misses the target,
+\begin{equation}
+\mathrm{err}_t=\mathbb{I}\{y_t\notin\mathcal{C}_t\},
+\end{equation}
+we update
+\begin{equation}
+\alpha_{t+1}=\Pi_{[\alpha_{\min},\alpha_{\max}]}
+\left(\alpha_t+\gamma(\alpha-\mathrm{err}_t)\right),
+\label{eq:aci}
+\end{equation}
+where $\gamma$ is the adaptation rate and $\Pi$ clips the value to a valid range. This creates wider intervals after repeated misses and narrower intervals when empirical errors are below target. Static, rolling, and adaptive variants are compared using coverage, width, interval score, and rolling coverage deviation.
+
+\subsection{Representation-Shift Evidence}
+Let $\boldsymbol{\mu}$ and $\boldsymbol{\Sigma}$ denote the mean and regularized covariance of calibration embeddings. For a new embedding $\mathbf{e}_t$, the representation-shift score is
+\begin{equation}
+d_t=\sqrt{(\mathbf{e}_t-\boldsymbol{\mu})^\top\boldsymbol{\Sigma}^{-1}(\mathbf{e}_t-\boldsymbol{\mu})}.
+\label{eq:mahal}
+\end{equation}
+Rather than interpreting $d_t$ as calibrated probability, it is converted into an empirical reliability component by ranking it relative to calibration scores. Lower shift implies higher reliability.
 
 \subsection{Reliability Fusion}
-Two principal evidence sources are considered: normalized prediction-interval width and representation-shift evidence. Let $r_{\mathrm{width}}$ and $r_{\mathrm{shift}}$ denote reliability values in $[0,1]$. The default fusion is a weighted combination,
+The framework uses two default evidence components: an interval-width score and an embedding-shift score. Let $w_t$ denote mean conformal interval width for sample $t$. A width-based reliability score is obtained by mapping $w_t$ relative to the calibration-width distribution, while the representation component is derived from Eq.~\eqref{eq:mahal}. The fused reliability is
 \begin{equation}
-r=w_1r_{\mathrm{width}}+w_2r_{\mathrm{shift}},\qquad w_1+w_2=1.
+r_t=\omega r_{t}^{\mathrm{width}}+(1-\omega)r_{t}^{\mathrm{shift}},\qquad 0\leq\omega\leq1.
+\label{eq:fusion}
 \end{equation}
-The weights and decision threshold are selected from calibration data only. Reliability is subsequently validated by measuring its association with realized forecast error and by risk--coverage analysis.
+The fusion weight and decision threshold are selected on calibration data only. Importantly, Eq.~\eqref{eq:fusion} is treated as a testable design choice: ablation experiments must show that fusion adds value beyond either component alone.
 
-\subsection{Selective Forecasting}
-Given a reliability threshold $\tau$, a forecast is accepted if $r\geq\tau$ and otherwise abstained. For different thresholds, the retained fraction defines coverage and the prediction error among retained samples defines risk. The resulting risk--coverage curve and its area quantify whether reliability-based abstention preferentially removes high-error predictions.
+\subsection{Reliability--Error Validation}
+A reliability score is useful only if it is informative about realized error. For each sample, define an aggregate forecast error
+\begin{equation}
+e_t=\frac{1}{H}\sum_{h=1}^{H}|y_{t,h}-\hat{y}_{t,h}|.
+\end{equation}
+We evaluate Pearson and Spearman association between $r_t$ and $e_t$, reliability-binned empirical error, and the ability of $1-r_t$ to detect high-error samples. Reliability is expected to be negatively associated with error; failure to establish this relationship is treated as evidence against the proposed reliability mechanism.
+
+\subsection{Selective Forecasting and Risk--Coverage Analysis}
+Given threshold $\tau$, the selection indicator is
+\begin{equation}
+a_t(\tau)=\mathbb{I}\{r_t\geq\tau\}.
+\end{equation}
+Prediction coverage is
+\begin{equation}
+C(\tau)=\frac{1}{N}\sum_{t=1}^{N}a_t(\tau),
+\end{equation}
+and selective risk under squared loss is
+\begin{equation}
+R(\tau)=\sqrt{\frac{\sum_t a_t(\tau)\|\mathbf{y}_t-\hat{\mathbf{y}}_t\|_2^2}{H\sum_t a_t(\tau)}}.
+\end{equation}
+Sweeping $\tau$ yields a risk--coverage curve, consistent with the selective-prediction literature \cite{geifman2017selective,geifman2019selectivenet}. We report the area under this curve (AURC) and retained-set error. A useful reliability mechanism should preferentially abstain on high-error forecasts rather than merely reduce coverage arbitrarily.
 
 \subsection{Interpretability and Explanation Stability}
-KAN univariate response functions are inspected across random seeds, time periods, and perturbed inputs. Stability is evaluated through function correlation and normalized distance metrics. Importantly, explanation stability is considered a core reliability component only if ablation experiments show incremental predictive value for realized error or selective risk; otherwise it is reported solely as an interpretability diagnostic.
+KAN edge functions are inspected across random seeds, temporal regimes, and controlled perturbations. For two sampled response curves $\mathbf{f}^{(a)}$ and $\mathbf{f}^{(b)}$, stability is quantified using Pearson correlation and normalized distance,
+\begin{equation}
+D_{\mathrm{norm}}=\frac{\|\mathbf{f}^{(a)}-\mathbf{f}^{(b)}\|_2}{\|\mathbf{f}^{(a)}\|_2+\|\mathbf{f}^{(b)}\|_2+\epsilon}.
+\end{equation}
+Explanation stability is promoted to a reliability component only if it improves held-out reliability--error association or selective risk beyond interval and shift evidence. Otherwise, it is reported solely as an interpretability diagnostic.
