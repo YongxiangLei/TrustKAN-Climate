@@ -72,6 +72,10 @@ python scripts/aggregate_results.py \
   --min-seeds 5
 ```
 
+Paired model comparisons follow the dependence-aware protocol in
+`docs/STATISTICAL_PROTOCOL.md`; overlapping forecast origins are evaluated with
+moving-block bootstrap rather than IID resampling.
+
 For reliability experiments, prepare an `.npz` split containing `x_train`, `y_train`, `x_val`, `y_val`, `x_cal`, `y_cal`, `x_test`, and `y_test`, then run:
 
 ```bash

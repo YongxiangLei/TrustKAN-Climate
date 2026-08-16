@@ -74,13 +74,14 @@ viewing test performance. Report sample counts, tail errors, interval coverage
 and width, and uncertainty in estimates. Avoid claiming event forecasting from
 a point-temperature tail analysis alone.
 
-### 8. Statistical inference must respect dependence
+### 8. Dependence-aware inference needs formal execution
 
-Forecast errors from overlapping windows and multi-step horizons are serially
-dependent. Naive sample-level tests or IID bootstrap confidence intervals would
-overstate evidence. Use paired comparisons on identical forecast cases with a
-block bootstrap or another dependence-aware procedure, report effect sizes and
-correct for the pre-defined family of primary comparisons.
+The code now uses forecast-origin circular moving-block bootstrap intervals,
+keeps multi-horizon elements together, verifies paired timestamps and exposes
+Holm/BH correction utilities. The protocol correctly demotes Wilcoxon to a
+sensitivity analysis. Remaining work is to pre-specify comparison families and
+block-length sensitivity checks, then execute the protocol on full multi-seed
+artifacts rather than smoke outputs.
 
 ### 9. Compute reporting is not yet publication-grade
 

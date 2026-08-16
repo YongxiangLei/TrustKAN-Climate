@@ -13,6 +13,7 @@ results/aggregated/*_config.yaml
 results/raw/
 results/tables/
 results/runs/
+results/statistical_tests/
 checkpoints/
 model/
 *.pth

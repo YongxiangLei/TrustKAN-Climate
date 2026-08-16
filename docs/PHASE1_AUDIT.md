@@ -17,7 +17,7 @@ not validate scientific superiority or support any manuscript result claim.
 - Verified that the standardizer is fitted on `values[split.train]` only.
 - Verified contiguous train/validation/calibration/test slices and no shuffling
   during window construction.
-- Ran the strengthened suite after result-integrity and Tem2-KAN fixes: 39 tests passed.
+- Ran the strengthened suite after result-integrity, Tem2-KAN and statistical fixes: 46 tests passed.
 - Ran the documented smoke benchmark end-to-end and verified that seven model
   runs produced raw prediction archives plus aggregated CSV outputs.
 
@@ -108,6 +108,17 @@ The formal CET config now pre-declares SVR and random-forest candidate sets.
 Candidates are fit only on training windows, selected by validation RMSE, and
 their complete selection trace is saved in the raw artifact. Test targets are
 not used for selection. Full executions remain pending.
+
+### P1 — IID statistical resampling ignored overlapping forecasts (fixed in code)
+
+The original paired bootstrap flattened all horizon elements and resampled them
+as independent observations. Primary comparisons now use a circular moving-block
+bootstrap over forecast origins, keeping each origin's complete horizon vector
+together. The default block is no shorter than the forecast horizon. Paired
+artifact comparison additionally requires identical timestamps, origins,
+dataset, split, fingerprints and matching stochastic seeds. Holm and
+Benjamini–Hochberg p-value adjustments are available for pre-specified families.
+Formal multi-seed comparisons remain pending.
 
 ## Leakage assessment
 

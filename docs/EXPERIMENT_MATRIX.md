@@ -16,7 +16,7 @@
 | E12 | Does reliability correlate with actual error? | TrustKAN | reliability-error correlation/calibration |
 | E13 | What happens on extremes? | key baselines + TrustKAN | tail/extreme-event subset metrics |
 | E14 | What is computational cost? | neural baselines | params, latency, training time, memory |
-| E15 | Are gains statistically credible? | main models | paired tests, effect sizes, confidence intervals |
+| E15 | Are gains statistically credible? | main models | forecast-origin moving-block bootstrap, paired effect sizes, corrected sensitivity tests |
 
 ## Main split policy
 Use chronological splits. Hyperparameter selection uses training/validation only. Final test is untouched until model selection is frozen. Conformal calibration uses a dedicated calibration segment or rigorously defined rolling protocol.
@@ -26,3 +26,6 @@ Main neural results: minimum 5 seeds. Prefer 10 for headline comparisons if comp
 
 ## Reporting
 Save one row per dataset/model/horizon/seed. Aggregate only downstream. Retain raw predictions for paired statistical analysis and reproducibility.
+
+Primary pairwise inference follows `docs/STATISTICAL_PROTOCOL.md`. Overlapping
+forecast origins are handled with moving-block rather than IID bootstrap.
