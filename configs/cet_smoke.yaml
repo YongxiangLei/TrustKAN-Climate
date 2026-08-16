@@ -4,6 +4,8 @@ dataset:
   date_column: date
   target_column: Pershore_College
   min_valid_temperature: -20
+  # Engineering-only tail subset; never use this configuration for paper results.
+  max_observations: 2000
 split:
   train: 0.60
   validation: 0.15

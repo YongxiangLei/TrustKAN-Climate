@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse,json
 from pathlib import Path
 import numpy as np
+import _bootstrap  # noqa: F401  # repository-root import setup
 from src.uncertainty.conformal import conformal_radius,apply_conformal,interval_coverage,mean_interval_width
 from src.uncertainty.adaptive import conformity_score,rolling_conformal,adaptive_conformal,rolling_coverage
 

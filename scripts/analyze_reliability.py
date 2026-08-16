@@ -4,6 +4,7 @@ import argparse,json
 from pathlib import Path
 import numpy as np
 import pandas as pd
+import _bootstrap  # noqa: F401  # repository-root import setup
 from src.reliability.calibration import sample_rmse,reliability_error_bins,reliability_error_association,top_error_detection,monotonicity_score
 
 

@@ -9,6 +9,7 @@ from pathlib import Path
 import numpy as np
 from torch.utils.data import DataLoader, TensorDataset
 import torch
+import _bootstrap  # noqa: F401  # repository-root import setup
 from src.models.trustkan import TrustKAN
 from src.training.trust_engine import train_trustkan, predict_trustkan
 from src.uncertainty.conformal import conformal_radius, apply_conformal, interval_coverage, mean_interval_width

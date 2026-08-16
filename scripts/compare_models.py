@@ -2,6 +2,7 @@
 from __future__ import annotations
 import argparse, json
 import numpy as np
+import _bootstrap  # noqa: F401  # repository-root import setup
 from src.statistics.paired_tests import wilcoxon_paired, paired_bootstrap_mae_difference, paired_cohens_d
 
 

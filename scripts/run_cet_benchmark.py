@@ -7,6 +7,7 @@ import pandas as pd
 import torch
 from torch.utils.data import DataLoader, TensorDataset
 import yaml
+import _bootstrap  # noqa: F401  # repository-root import setup
 from src.data.timeseries import chronological_split, sliding_windows, TrainOnlyStandardizer, assign_windows_by_target_origin
 from src.metrics.forecast import mae, rmse
 from src.models.baselines import MLPForecaster, RNNForecaster, TransformerForecaster, PersistenceForecaster
@@ -57,14 +58,17 @@ def main(config):
     cfg=load_config(config); path=ensure_data(cfg)
     d=pd.read_csv(path,parse_dates=[cfg["dataset"]["date_column"]]); s=d[cfg["dataset"]["target_column"]].dropna()
     values=s[s>=cfg["dataset"]["min_valid_temperature"]].astype(float).values
+    max_observations=cfg["dataset"].get("max_observations")
+    if max_observations is not None:
+        if not isinstance(max_observations,int) or max_observations<=0:
+            raise ValueError("dataset.max_observations must be a positive integer")
+        values=values[-max_observations:]
     split=chronological_split(len(values),cfg["split"]["train"],cfg["split"]["validation"],cfg["split"]["calibration"])
     scaler=TrainOnlyStandardizer().fit(values[split.train]); z=scaler.transform(values)
     rows=[]; outdir=Path("results/raw"); outdir.mkdir(parents=True,exist_ok=True)
     for horizon in cfg["window"]["horizons"]:
-        X,y,origins=sliding_windows(z,cfg["window"]["history"],horizon); masks=assign_windows_by_target_origin(origins,split)
+        X,y,origins=sliding_windows(z,cfg["window"]["history"],horizon); masks=assign_windows_by_target_origin(origins,split,horizon)
         sets={k:(X[m],y[m]) for k,m in masks.items()}
-        for k,sl in [("train",split.train),("val",split.val),("calibration",split.calibration),("test",split.test)]:
-            valid=origins[masks[k]]+horizon<=sl.stop; sets[k]=(sets[k][0][valid],sets[k][1][valid])
         test_x,test_y=sets["test"]; test_y_raw=inverse_target(scaler,test_y)
         for name in cfg["models"]:
             seeds=[-1] if name=="persistence" else cfg["training"]["seeds"]

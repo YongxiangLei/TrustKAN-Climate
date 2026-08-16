@@ -26,6 +26,8 @@ def chronological_split(n: int, train=0.60, val=0.15, calibration=0.10) -> Tempo
     i1 = int(n * train)
     i2 = i1 + int(n * val)
     i3 = i2 + int(n * calibration)
+    if not (0 < i1 < i2 < i3 < n):
+        raise ValueError("Split fractions produce an empty chronological segment")
     return TemporalSplit(slice(0, i1), slice(i1, i2), slice(i2, i3), slice(i3, n))
 
 
@@ -69,13 +71,18 @@ class TrainOnlyStandardizer:
         return out.reshape(original_shape)
 
 
-def assign_windows_by_target_origin(origins, split: TemporalSplit):
-    """Assign windows according to the first forecasted timestamp.
+def assign_windows_by_target_origin(origins, split: TemporalSplit, horizon: int = 1):
+    """Assign windows whose complete target lies within one split.
 
-    This prevents target values from one chronological region being silently
-    mixed with another during evaluation.
+    ``origins`` contains the first forecasted timestamp. Requiring the exclusive
+    target end to be at or before the split end prevents a multi-step target from
+    crossing a train/validation/calibration/test boundary.
     """
     origins = np.asarray(origins)
+    if horizon <= 0:
+        raise ValueError("horizon must be positive")
+
     def mask(s: slice):
-        return (origins >= s.start) & (origins < s.stop)
+        return (origins >= s.start) & (origins + horizon <= s.stop)
+
     return {"train": mask(split.train), "val": mask(split.val), "calibration": mask(split.calibration), "test": mask(split.test)}

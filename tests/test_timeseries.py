@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 from src.data.timeseries import chronological_split, sliding_windows, TrainOnlyStandardizer, assign_windows_by_target_origin
 
@@ -33,3 +34,25 @@ def test_window_assignment_by_target_origin():
     masks = assign_windows_by_target_origin(origins, split)
     assert np.all(origins[masks["train"]] < split.train.stop)
     assert np.all(origins[masks["test"]] >= split.test.start)
+
+
+def test_multi_step_targets_do_not_cross_split_boundaries():
+    split = chronological_split(20, train=0.5, val=0.2, calibration=0.1)
+    _, _, origins = sliding_windows(np.arange(20), history=3, horizon=3)
+    masks = assign_windows_by_target_origin(origins, split, horizon=3)
+    for name, region in (
+        ("train", split.train),
+        ("val", split.val),
+        ("calibration", split.calibration),
+        ("test", split.test),
+    ):
+        selected = origins[masks[name]]
+        assert np.all(selected >= region.start)
+        assert np.all(selected + 3 <= region.stop)
+
+    assert not masks["train"][np.flatnonzero(origins == split.train.stop - 1)[0]]
+
+
+def test_split_rejects_empty_segments_after_rounding():
+    with pytest.raises(ValueError, match="empty chronological segment"):
+        chronological_split(8, train=0.6, val=0.15, calibration=0.1)

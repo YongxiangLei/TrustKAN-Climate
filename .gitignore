@@ -8,6 +8,7 @@ venv/
 data/raw/*.csv
 results/raw/*.npz
 results/aggregated/*.csv
+results/aggregated/*.json
 checkpoints/
 *.pth
 *.pt
