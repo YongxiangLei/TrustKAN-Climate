@@ -1,0 +1,39 @@
+\section{Experimental Setup}
+\label{sec:experiments}
+
+\subsection{Datasets}
+The study is designed around four complementary climate/weather sources: Central England Temperature (CET), NOAA/NCEI GHCN-Daily station observations, Jena weather-station measurements, and ERA5 reanalysis. CET provides continuity with prior climate KAN work; GHCN-Daily evaluates station-level geographic generalization; Jena provides high-frequency multivariate observations; and ERA5 supports reanalysis-based multivariate and distribution-shift experiments. Exact station choices, variables, date ranges, units, missing-data rules, licenses, and download procedures must be frozen before headline experiments. \todo{Populate Table~\ref{tab:datasets} only after dataset metadata are finalized.}
+
+\begin{table}[t]
+\centering
+\caption{Dataset characteristics. All entries must be generated from finalized dataset metadata.}
+\label{tab:datasets}
+\begin{tabular}{lcccc}
+\toprule
+Dataset & Resolution & Variables & Period & Samples \\
+\midrule
+CET & \todo{daily} & \todo{} & \todo{} & \todo{} \\
+GHCN-Daily & \todo{} & \todo{} & \todo{} & \todo{} \\
+Jena & \todo{} & \todo{} & \todo{} & \todo{} \\
+ERA5 & \todo{} & \todo{} & \todo{} & \todo{} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Chronological Splitting and Leakage Prevention}
+All time series are split chronologically into training, validation, calibration, and final test regions. Normalization parameters are estimated from training observations only. Windowed samples are assigned according to forecast-target origin, and windows whose forecast target crosses a split boundary are excluded. Hyperparameter selection uses training and validation data; conformal correction and reliability thresholds use calibration data; the final test set is reserved exclusively for evaluation.
+
+\subsection{Forecasting Tasks}
+Experiments include multiple forecast horizons selected according to each dataset's temporal resolution. The CET development benchmark currently considers 1-, 7-, 30-, and 90-step horizons. Equivalent horizon sets for other datasets will be specified before final experiments so that comparisons are meaningful within each temporal resolution.
+
+\subsection{Baselines}
+The benchmark includes persistence and classical machine-learning models, recurrent networks, temporal convolution, Transformer and state-space sequence models, a standard KAN baseline, a Tem$^2$-KAN reference implementation, and the proposed \method. Optional models are reported as failed/unavailable rather than silently removed if dependencies or execution fail. Hyperparameter tuning effort should be comparable across major learned baselines.
+
+\subsection{Evaluation Metrics}
+Deterministic forecasting is evaluated using MAE and RMSE in physical target units. Probabilistic forecasting uses empirical interval coverage, mean prediction-interval width, and interval/calibration scores where supported. Reliability is evaluated using reliability--error correlation, large-error detection AUROC/AUPRC, risk--coverage curves, AURC, retained-sample error, and abstention rate. Efficiency analysis reports parameter count, training time, inference latency, and memory where measurable.
+
+\subsection{Statistical Analysis}
+Headline neural comparisons use at least five independent random seeds. Paired comparisons are computed from predictions on identical test targets. The analysis includes paired Wilcoxon tests, bootstrap confidence intervals for error differences, and paired effect sizes. Statistical significance is interpreted together with effect magnitude and practical relevance rather than as a binary criterion.
+
+\subsection{Robustness and Shift Protocols}
+Robustness experiments include sensor noise, missing inputs, temporal regime shift, and extreme-event subsets. Adaptive/rolling conformal experiments evaluate coverage through time rather than only as an aggregate. Any synthetic corruption level or shift definition must be fixed before examining final model rankings.
