@@ -1,0 +1,51 @@
+\section{Results}
+\label{sec:results}
+
+This section must be populated only from machine-readable experiment outputs. Numerical values should not be typed manually into the manuscript.
+
+\subsection{Deterministic Forecasting}
+\todo{Insert generated multi-dataset, multi-horizon comparison table. Discuss mean$\pm$std performance, not only the best single run. Report cases where TrustKAN does not rank first.}
+
+\IfFileExists{tables/benchmark_summary.tex}{\input{tables/benchmark_summary.tex}}{}
+
+\subsection{Probabilistic Forecasting and Calibration}
+\todo{Insert static conformal and quantile-forecast results: empirical coverage, interval width, interval score, and calibration deviation. Compare static, rolling, and adaptive calibration.}
+
+\subsection{Adaptive Conformal Performance under Drift}
+\todo{Report rolling coverage trajectories and interval-width trade-offs under temporal drift. Quantify whether adaptive calibration improves coverage stability and whether it pays for this through excessive interval expansion.}
+
+\begin{figure}[t]
+\centering
+\IfFileExists{figures/rolling_coverage.pdf}{\includegraphics[width=\columnwidth]{rolling_coverage.pdf}}{\fbox{\parbox{0.9\columnwidth}{\centering Rolling coverage figure will be generated from experiment outputs.}}}
+\caption{Rolling empirical coverage under static, rolling, and adaptive conformal calibration.}
+\label{fig:rollingcoverage}
+\end{figure}
+
+\subsection{Reliability--Error Association}
+\todo{Report Spearman/Pearson association, reliability-bin errors, and AUROC/AUPRC for identifying high-error predictions. A reliability score that does not predict realized error should not be presented as a core contribution.}
+
+\begin{figure}[t]
+\centering
+\IfFileExists{figures/reliability_vs_error.pdf}{\includegraphics[width=\columnwidth]{reliability_vs_error.pdf}}{\fbox{\parbox{0.9\columnwidth}{\centering Reliability--error figure will be generated from experiment outputs.}}}
+\caption{Relationship between estimated reliability and realized forecasting error.}
+\label{fig:reliabilityerror}
+\end{figure}
+
+\subsection{Selective Prediction}
+\todo{Insert risk--coverage curves and quantify AURC, retained-set RMSE/MAE, abstention rate, and large-error removal rate. Compare against simple uncertainty-only and shift-only selection.}
+
+\begin{figure}[t]
+\centering
+\IfFileExists{figures/risk_coverage.pdf}{\includegraphics[width=\columnwidth]{risk_coverage.pdf}}{\fbox{\parbox{0.9\columnwidth}{\centering Risk--coverage figure will be generated from experiment outputs.}}}
+\caption{Risk--coverage behaviour for selective forecasting.}
+\label{fig:riskcoverage}
+\end{figure}
+
+\subsection{Ablation Study}
+\todo{Report the predefined A0--A9 ablations. Remove any claimed contribution whose ablation does not show incremental and reproducible value.}
+
+\subsection{Interpretability and Explanation Stability}
+\todo{Visualize representative KAN functions and quantify stability across seeds, periods, and perturbations. Distinguish physically plausible observations from unsupported causal interpretation.}
+
+\subsection{Robustness, Extremes, and Efficiency}
+\todo{Report noise, missing-data, extreme-event, and computational experiments. Include failure cases and performance/complexity trade-offs.}
