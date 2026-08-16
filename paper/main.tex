@@ -1,0 +1,40 @@
+\documentclass[journal]{IEEEtran}
+\usepackage{amsmath,amssymb,bm}
+\usepackage{booktabs,multirow}
+\usepackage{graphicx}
+\usepackage{siunitx}
+\usepackage{url}
+\usepackage{cite}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\graphicspath{{figures/}}
+\newcommand{\method}{TrustKAN-Climate}
+\newcommand{\todo}[1]{\textcolor{red}{[TODO: #1]}}
+
+\title{TrustKAN-Climate: Interpretable and Reliability-Aware Kolmogorov--Arnold Networks for Climate Forecasting under Distribution Shift}
+
+\author{Yongxiang Lei,~\IEEEmembership{Member,~IEEE}%
+\thanks{Author affiliations, funding acknowledgements, and correspondence details will be finalized before submission.}}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Reliable climate forecasting requires more than low point-prediction error: a model should also communicate uncertainty, remain informative under distribution shift, and indicate when its predictions should not be trusted. This paper develops \method, an interpretable and reliability-aware forecasting framework built around temporal Kolmogorov--Arnold Network (KAN) representations. The framework combines intrinsic nonlinear functional mappings with probabilistic prediction, conformal calibration, distribution-shift scoring, and selective prediction. A dedicated calibration split is used to avoid tuning reliability thresholds on the final test data. The empirical study is designed across multiple climate and weather datasets, forecast horizons, and modern baselines, with explicit evaluation of deterministic accuracy, interval calibration, robustness under drift, explanation stability, selective risk, and computational cost. \todo{Replace this abstract with evidence-backed quantitative findings after the final experiment freeze.}
+\end{abstract}
+
+\begin{IEEEkeywords}
+Kolmogorov--Arnold networks, climate forecasting, trustworthy artificial intelligence, uncertainty quantification, conformal prediction, distribution shift, selective prediction, interpretability.
+\end{IEEEkeywords}
+
+\input{sections/introduction}
+\input{sections/related_work}
+\input{sections/methodology}
+\input{sections/experimental_setup}
+\input{sections/results}
+\input{sections/discussion}
+\input{sections/conclusion}
+
+\bibliographystyle{IEEEtran}
+\bibliography{references}
+\end{document}
