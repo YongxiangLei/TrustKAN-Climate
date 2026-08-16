@@ -1,0 +1,14 @@
+\section{Related Work}
+\label{sec:related}
+
+\subsection{Data-Driven Climate and Weather Forecasting}
+Climate and weather time-series forecasting has been studied using statistical models, tree-based machine learning, recurrent neural networks, temporal convolutional models, Transformer architectures, and state-space sequence models. The final manuscript will position the selected baselines according to the exact datasets and forecasting horizons used in this study. \todo{Insert verified citations only; do not add references that have not been checked against the original publications.}
+
+\subsection{Kolmogorov--Arnold Networks for Temporal Prediction}
+KANs replace fixed scalar activations on edges with learnable univariate functions, offering a representation in which nonlinear input--output relationships can be inspected. Previous KAN-based temporal prediction studies motivate their use for climate variables, but the present study focuses on a different question: whether KAN representations can support reliability assessment under shift in addition to deterministic prediction. \todo{Add verified citations to original KAN work and prior Tem2-KAN/climate KAN studies.}
+
+\subsection{Uncertainty Quantification and Conformal Prediction}
+Probabilistic forecasting methods include quantile regression, Bayesian approximations, ensembles, and conformal prediction. Conformal methods are appealing because they calibrate prediction sets using empirical nonconformity scores under stated exchangeability assumptions. Time-series distribution shift motivates rolling or adaptive variants that update calibration information sequentially. \todo{Add primary-source citations for split conformal, adaptive conformal inference, and relevant time-series conformal methods.}
+
+\subsection{Distribution Shift, Reliability, and Selective Prediction}
+A forecast can be well calibrated on historical validation data yet become unreliable when the input distribution or error process changes. Shift detection and selective prediction provide complementary mechanisms: the former identifies departures from a reference regime, whereas the latter allows a predictor to abstain when estimated reliability is insufficient. The central empirical requirement in this paper is that any reliability score must be validated against realized error and risk--coverage behaviour rather than justified only by intuition.
