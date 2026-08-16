@@ -1,0 +1,42 @@
+\section{Methodology}
+\label{sec:method}
+
+\subsection{Problem Formulation}
+Let $\mathbf{x}_t\in\mathbb{R}^{d}$ denote the climate or weather variables observed at time $t$. Given a history window of length $L$, the forecasting task is to estimate a future target vector $\mathbf{y}_{t+1:t+H}$ over horizon $H$. We seek not only a point forecast $\hat{\mathbf{y}}$ but also a reliability characterization that supports calibrated intervals and selective use of the prediction.
+
+\subsection{Temporal KAN Representation}
+The proposed model first maps the input sequence through a temporal encoder and then through a KAN-style nonlinear representation. For a hidden vector $\mathbf{z}$, the KAN mapping is represented as a sum of learnable univariate functions across input dimensions,
+\begin{equation}
+\mathbf{h}=\mathbf{b}(\mathbf{z})+\sum_j \boldsymbol{\phi}_j(z_j),
+\end{equation}
+where the current implementation parameterizes $\boldsymbol{\phi}_j$ using Gaussian radial basis expansions. This design preserves inspectable nonlinear functions while allowing the temporal encoder to capture local temporal dependencies.
+
+\subsection{Point and Quantile Forecasting}
+The encoded representation is pooled to a fixed-dimensional embedding $\mathbf{e}$. A point head predicts $\hat{\mathbf{y}}$, while a quantile head predicts lower, median, and upper conditional quantiles. Training combines point mean-squared error and quantile pinball loss,
+\begin{equation}
+\mathcal{L}=\mathcal{L}_{\mathrm{MSE}}+\lambda_q\mathcal{L}_{\mathrm{quantile}}.
+\end{equation}
+The weighting $\lambda_q$ is treated as a configurable hyperparameter and must be tuned using training/validation data only.
+
+\subsection{Conformal Calibration}
+Let $[\hat{\ell}_i,\hat{u}_i]$ denote the model interval for a calibration sample with target $y_i$. The nonconformity score is
+\begin{equation}
+s_i=\max\{\hat{\ell}_i-y_i,\; y_i-\hat{u}_i,\;0\}.
+\end{equation}
+A finite-sample conformal radius is obtained from an empirical quantile of the calibration scores and added symmetrically to the predicted interval. We compare static split conformal calibration with rolling and adaptive variants. In the sequential variants, the label for the current time step is incorporated only after its interval has been issued.
+
+\subsection{Distribution-Shift Evidence}
+The model embedding $\mathbf{e}$ is used to construct a reference distribution from calibration samples. A Mahalanobis-type distance provides one representation-shift score. This score is converted to a reliability component relative to the empirical calibration distribution. The design is deliberately modular so that representation shift can be removed in controlled ablations.
+
+\subsection{Reliability Fusion}
+Two principal evidence sources are considered: normalized prediction-interval width and representation-shift evidence. Let $r_{\mathrm{width}}$ and $r_{\mathrm{shift}}$ denote reliability values in $[0,1]$. The default fusion is a weighted combination,
+\begin{equation}
+r=w_1r_{\mathrm{width}}+w_2r_{\mathrm{shift}},\qquad w_1+w_2=1.
+\end{equation}
+The weights and decision threshold are selected from calibration data only. Reliability is subsequently validated by measuring its association with realized forecast error and by risk--coverage analysis.
+
+\subsection{Selective Forecasting}
+Given a reliability threshold $\tau$, a forecast is accepted if $r\geq\tau$ and otherwise abstained. For different thresholds, the retained fraction defines coverage and the prediction error among retained samples defines risk. The resulting risk--coverage curve and its area quantify whether reliability-based abstention preferentially removes high-error predictions.
+
+\subsection{Interpretability and Explanation Stability}
+KAN univariate response functions are inspected across random seeds, time periods, and perturbed inputs. Stability is evaluated through function correlation and normalized distance metrics. Importantly, explanation stability is considered a core reliability component only if ablation experiments show incremental predictive value for realized error or selective risk; otherwise it is reported solely as an interpretability diagnostic.
