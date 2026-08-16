@@ -1,0 +1,20 @@
+dataset:
+  name: CET-Pershore
+  source: https://raw.githubusercontent.com/YongxiangLei/kan_proj/main/cet_mean_station_series.csv
+  date_column: date
+  target_column: Pershore_College
+  min_valid_temperature: -20
+split:
+  train: 0.60
+  validation: 0.15
+  calibration: 0.10
+window:
+  history: 365
+  horizons: [1]
+training:
+  batch_size: 64
+  epochs: 2
+  patience: 2
+  learning_rate: 0.001
+  seeds: [11]
+models: [persistence, mlp, lstm, gru, transformer, kan, trustkan]
