@@ -30,6 +30,7 @@ def test_station_normalization_is_fit_on_training_period_only():
     built=bundle("north")
     assert built.scaler.scaler.mean_[0] < built.series.target.mean()
     assert built.test_target_times.shape==built.test_target_raw.shape
+    assert built.calibration_target_times.shape==built.calibration_target_raw.shape
     assert built.test_origins.min() >= int(len(built.series.target)*0.8)
 
 

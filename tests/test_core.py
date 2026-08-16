@@ -1,9 +1,16 @@
 import numpy as np
 import torch
 
-from src.metrics.forecast import rmse, risk_coverage_curve
+from src.metrics.forecast import rmse, risk_coverage_curve, sample_risk_coverage_curve
 from src.models.trustkan import TrustKAN
-from src.uncertainty.conformal import conformal_radius, apply_conformal
+from src.uncertainty.conformal import (
+    apply_conformal,
+    conformal_radius,
+    horizonwise_conformal_radii,
+    joint_interval_coverage,
+    mean_interval_score,
+    simultaneous_conformal_radius,
+)
 
 
 def test_trustkan_shapes():
@@ -38,3 +45,22 @@ def test_selective_curve_lengths():
     coverage, risk = risk_coverage_curve(y, yhat, reliability)
     assert len(coverage) == len(risk) == 3
     assert rmse(y[:1], yhat[:1]) == 0.0
+
+
+def test_multihorizon_conformal_separates_marginal_and_joint_calibration():
+    y=np.array([[0.,0.],[0.,10.],[0.,0.],[0.,0.]])
+    lo=np.full_like(y,-1.); hi=np.full_like(y,1.)
+    radii=horizonwise_conformal_radii(y,lo,hi,alpha=.25)
+    simultaneous=simultaneous_conformal_radius(y,lo,hi,alpha=.25)
+    assert radii.shape==(2,)
+    assert simultaneous>=radii.max()
+    expanded=apply_conformal(lo,hi,simultaneous)
+    assert joint_interval_coverage(y,*expanded)>=.75
+    assert mean_interval_score(y,*expanded,alpha=.25)>=0
+
+
+def test_sample_risk_curve_keeps_horizon_vectors_together():
+    y=np.zeros((3,2)); pred=np.array([[0.,0.],[1.,1.],[3.,3.]])
+    coverage,risk=sample_risk_coverage_curve(y,pred,[.9,.8,.1])
+    assert len(coverage)==len(risk)==3
+    assert risk[0]==0.0

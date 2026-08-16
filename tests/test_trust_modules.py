@@ -40,6 +40,14 @@ def test_threshold_selected_without_test_information():
     assert selected['coverage'] >= .5
 
 
+def test_threshold_selection_retains_multihorizon_origins_together():
+    y=np.zeros((4,2)); p=np.array([[0.,0.],[.1,.1],[2.,2.],[3.,3.]])
+    r=np.array([.9,.8,.2,.1])
+    selected=choose_threshold_on_calibration(y,p,r,min_coverage=.5)
+    assert selected is not None
+    assert selected["coverage"]>=.5
+
+
 def test_curve_stability_identical_curves():
     a=np.array([[0.,1.,2.],[2.,1.,0.]])
     assert np.allclose(curve_correlation(a,a),1.0)

@@ -72,6 +72,9 @@ unless a separately pre-registered hierarchical analysis is used.
 Publication aggregation must use both `--min-seeds 5` and `--min-regions 5`;
 the command fails if a model/protocol/horizon group has an incomplete panel.
 
+TrustKAN interval calibration and selective prediction use the separate frozen
+protocol in `docs/GHCN_RELIABILITY_PROTOCOL.md`.
+
 `configs/ghcn_smoke.yaml` uses two regions, one seed, one epoch, a shorter
 history, and a recent tail subset. It validates software only and is prohibited
 from manuscript result tables. `configs/ghcn.yaml` is the full frozen protocol.

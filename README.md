@@ -119,6 +119,34 @@ It includes separate within-station and leave-one-region-out parameter-transfer
 tasks. Exact leakage controls and reporting rules are defined in
 `docs/GHCN_BENCHMARK_PROTOCOL.md`.
 
+Run the engineering-only uncertainty and reliability check with:
+
+```bash
+python scripts/run_ghcn_reliability.py \
+  --config configs/ghcn_reliability_smoke.yaml
+python scripts/aggregate_reliability.py \
+  --input results/reliability/aggregated/ghcn_reliability_smoke_runs.csv \
+  --outdir results/tables/ghcn_reliability_smoke \
+  --min-regions 2
+```
+
+The publication run uses all regions and seeds and fails closed on incomplete
+panels:
+
+```bash
+python scripts/run_ghcn_reliability.py \
+  --config configs/ghcn_reliability.yaml --resume
+python scripts/aggregate_reliability.py \
+  --input results/reliability/aggregated/ghcn_reliability_full_runs.csv \
+  --outdir results/tables/ghcn_reliability_full \
+  --min-seeds 5 \
+  --min-regions 5
+```
+
+Marginal versus simultaneous coverage, target calibration in geographic
+transfer, and selective-risk rules are frozen in
+`docs/GHCN_RELIABILITY_PROTOCOL.md`.
+
 For reliability experiments, prepare an `.npz` split containing `x_train`, `y_train`, `x_val`, `y_val`, `x_cal`, `y_cal`, `x_test`, and `y_test`, then run:
 
 ```bash

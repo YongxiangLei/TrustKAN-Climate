@@ -53,6 +53,30 @@ def test_ghcn_window_audit_file_entrypoint_can_import_project():
     assert "--out" in result.stdout
 
 
+def test_ghcn_reliability_entrypoints_can_import_project():
+    for script in ("run_ghcn_reliability.py", "aggregate_reliability.py"):
+        result = subprocess.run(
+            [sys.executable, f"scripts/{script}", "--help"],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0, result.stderr
+        assert "--input" in result.stdout or "--config" in result.stdout
+
+
+def test_generic_reliability_entrypoint_can_import_project():
+    result = subprocess.run(
+        [sys.executable, "scripts/run_trustkan_reliability.py", "--help"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "--split-file" in result.stdout
+    assert "--seed" in result.stdout
+
+
 def test_code_fingerprint_is_independent_of_working_directory(tmp_path):
     root = Path(__file__).resolve().parents[1]
     scripts = root / "scripts"

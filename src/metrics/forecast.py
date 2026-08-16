@@ -26,5 +26,22 @@ def risk_coverage_curve(y, yhat, reliability):
     return coverage, cumulative_risk
 
 
+def sample_risk_coverage_curve(y, yhat, reliability):
+    """Selective RMSE curve retaining whole forecast origins together."""
+    y = np.asarray(y, dtype=float)
+    yhat = np.asarray(yhat, dtype=float)
+    reliability = np.asarray(reliability, dtype=float).reshape(-1)
+    if y.shape != yhat.shape or y.ndim == 0 or y.shape[0] != len(reliability):
+        raise ValueError("Reliability must align with the forecast-origin dimension")
+    axes = tuple(range(1, y.ndim))
+    sample_mse = ((y - yhat) ** 2).mean(axis=axes) if axes else (y - yhat) ** 2
+    order = np.argsort(-reliability, kind="stable")
+    cumulative_risk = np.sqrt(
+        np.cumsum(sample_mse[order]) / np.arange(1, len(reliability) + 1)
+    )
+    coverage = np.arange(1, len(reliability) + 1) / len(reliability)
+    return coverage, cumulative_risk
+
+
 def aurc(coverage, risk):
-    return float(np.trapz(np.asarray(risk), np.asarray(coverage)))
+    return float(np.trapezoid(np.asarray(risk), np.asarray(coverage)))

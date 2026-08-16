@@ -41,6 +41,9 @@ class StationWindows:
     series: StationSeries
     scaler: TrainOnlyStandardizer
     sets: dict[str, tuple[np.ndarray, np.ndarray]]
+    calibration_target_raw: np.ndarray
+    calibration_origins: np.ndarray
+    calibration_target_times: np.ndarray
     test_target_raw: np.ndarray
     test_origins: np.ndarray
     test_target_times: np.ndarray
@@ -57,8 +60,12 @@ class EvaluationSpec:
     source_pooling: str
     train_set: tuple[np.ndarray, np.ndarray]
     validation_set: tuple[np.ndarray, np.ndarray]
+    calibration_set: tuple[np.ndarray, np.ndarray]
     test_set: tuple[np.ndarray, np.ndarray]
     target_scaler: TrainOnlyStandardizer
+    calibration_target_raw: np.ndarray
+    calibration_origins: np.ndarray
+    calibration_target_times: np.ndarray
     test_target_raw: np.ndarray
     test_origins: np.ndarray
     test_target_times: np.ndarray
@@ -104,22 +111,31 @@ def build_station_windows(
             raise ValueError(
                 f"No {name} windows for {series.region}/{series.station_id} at horizon {horizon}"
             )
-    test_origins = origins[masks["test"]]
-    target_times = np.stack(
-        [dates[origin : origin + horizon] for origin in test_origins]
-    )
-    test_target = sets["test"][1]
-    shape = test_target.shape
-    test_target_raw = scaler.scaler.inverse_transform(
-        test_target.reshape(-1, 1)
-    ).reshape(shape)
+    def raw_target(split_name):
+        target_values = sets[split_name][1]
+        shape = target_values.shape
+        return scaler.scaler.inverse_transform(
+            target_values.reshape(-1, 1)
+        ).reshape(shape)
+
+    def times(split_name):
+        split_origins = origins[masks[split_name]]
+        return split_origins, np.stack(
+            [dates[origin : origin + horizon] for origin in split_origins]
+        )
+
+    calibration_origins, calibration_times = times("calibration")
+    test_origins, test_times = times("test")
     return StationWindows(
         series=series,
         scaler=scaler,
         sets=sets,
-        test_target_raw=test_target_raw,
+        calibration_target_raw=raw_target("calibration"),
+        calibration_origins=calibration_origins,
+        calibration_target_times=calibration_times,
+        test_target_raw=raw_target("test"),
         test_origins=test_origins,
-        test_target_times=target_times,
+        test_target_times=test_times,
     )
 
 
@@ -168,8 +184,12 @@ def build_evaluation_specs(
                     source_pooling="single_station",
                     train_set=bundle.sets["train"],
                     validation_set=bundle.sets["val"],
+                    calibration_set=bundle.sets["calibration"],
                     test_set=bundle.sets["test"],
                     target_scaler=bundle.scaler,
+                    calibration_target_raw=bundle.calibration_target_raw,
+                    calibration_origins=bundle.calibration_origins,
+                    calibration_target_times=bundle.calibration_target_times,
                     test_target_raw=bundle.test_target_raw,
                     test_origins=bundle.test_origins,
                     test_target_times=bundle.test_target_times,
@@ -196,8 +216,12 @@ def build_evaluation_specs(
                     source_pooling="equal_region_deterministic_subsample",
                     train_set=_pool_equal_regions(sources, "train"),
                     validation_set=_pool_equal_regions(sources, "val"),
+                    calibration_set=target.sets["calibration"],
                     test_set=target.sets["test"],
                     target_scaler=target.scaler,
+                    calibration_target_raw=target.calibration_target_raw,
+                    calibration_origins=target.calibration_origins,
+                    calibration_target_times=target.calibration_target_times,
                     test_target_raw=target.test_target_raw,
                     test_origins=target.test_origins,
                     test_target_times=target.test_target_times,

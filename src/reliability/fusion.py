@@ -43,14 +43,19 @@ def choose_threshold_on_calibration(y_true,y_pred,reliability,max_risk=None,min_
     while maximizing coverage. Otherwise select the threshold minimizing RMSE
     subject to coverage>=min_coverage.
     """
-    y=np.asarray(y_true,float).reshape(-1); p=np.asarray(y_pred,float).reshape(-1); r=np.asarray(reliability,float).reshape(-1)
-    if not(len(y)==len(p)==len(r)): raise ValueError("Inputs must have equal length")
+    y=np.asarray(y_true,float); p=np.asarray(y_pred,float); r=np.asarray(reliability,float).reshape(-1)
+    if y.shape!=p.shape: raise ValueError("Target and prediction shapes must match")
+    if y.ndim==0 or y.shape[0]!=len(r):
+        raise ValueError("Reliability must provide one score per forecast origin")
+    axes=tuple(range(1,y.ndim))
+    squared=(y-p)**2
+    sample_mse=squared.mean(axis=axes) if axes else squared
     candidates=np.unique(r)
     best=None
     for t in candidates:
         m=r>=t; cov=m.mean()
         if not m.any() or cov<min_coverage: continue
-        risk=float(np.sqrt(np.mean((y[m]-p[m])**2)))
+        risk=float(np.sqrt(np.mean(sample_mse[m])))
         if max_risk is not None:
             if risk<=max_risk and (best is None or cov>best["coverage"]): best={"threshold":float(t),"coverage":float(cov),"rmse":risk}
         else:

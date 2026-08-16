@@ -28,11 +28,12 @@ def train_trustkan(
     patience=10,
     point_weight=1.0,
     quantile_weight=1.0,
+    weight_decay=0.01,
     device=None,
 ):
     device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = model.to(device)
-    opt = torch.optim.AdamW(model.parameters(), lr=lr)
+    opt = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
     mse = nn.MSELoss()
     best = copy.deepcopy(model.state_dict())
     best_val = float("inf")
