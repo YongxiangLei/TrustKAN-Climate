@@ -1,0 +1,44 @@
+% Editable vector framework figure for TrustKAN-Climate.
+\begin{tikzpicture}[
+  font=\footnotesize,
+  node distance=6mm and 7mm,
+  box/.style={draw, rounded corners=2pt, align=center, minimum height=9mm, text width=24mm, fill=white},
+  data/.style={box, fill=blue!6, draw=blue!55!black},
+  model/.style={box, fill=orange!8, draw=orange!70!black},
+  trust/.style={box, fill=green!7, draw=green!55!black},
+  decision/.style={box, fill=purple!7, draw=purple!60!black},
+  arr/.style={-{Latex[length=2mm]}, thick, draw=black!65}
+]
+\node[data] (data) {Climate / weather\\history $\mathbf{X}_t$};
+\node[model, right=of data] (temporal) {Temporal\\encoder $g_\theta$};
+\node[model, right=of temporal] (kan) {KAN functional\\representation};
+\node[model, right=of kan] (embed) {Embedding\\$\mathbf e_t$};
+
+\node[model, above right=8mm and 9mm of embed] (point) {Point head\\$\hat{\mathbf y}_t$};
+\node[model, right=of embed] (quant) {Quantile head\\$\hat q^{(\tau)}$};
+\node[trust, right=of quant] (conf) {Static / rolling /\\adaptive conformal};
+\node[trust, below right=8mm and 9mm of embed] (shift) {Representation\\shift $d_t$};
+
+\node[trust, right=15mm of conf] (width) {Interval-width\\reliability};
+\node[trust, below=of width] (fusion) {Reliability fusion\\$r_t$};
+\node[decision, right=of fusion] (gate) {Selective gate\\accept / abstain};
+\node[decision, right=of gate] (eval) {Risk--coverage\\decision support};
+
+\draw[arr] (data) -- (temporal);
+\draw[arr] (temporal) -- (kan);
+\draw[arr] (kan) -- (embed);
+\draw[arr] (embed) -- (point);
+\draw[arr] (embed) -- (quant);
+\draw[arr] (quant) -- (conf);
+\draw[arr] (conf) -- (width);
+\draw[arr] (embed) -- (shift);
+\draw[arr] (width) -- (fusion);
+\draw[arr] (shift.east) -| (fusion.south);
+\draw[arr] (fusion) -- (gate);
+\draw[arr] (point.east) -| (gate.north);
+\draw[arr] (gate) -- (eval);
+
+\node[below=12mm of kan, align=center, text width=70mm] (interp) {\textbf{Interpretability analysis:} learned KAN edge functions, lag/feature effects, cross-seed and cross-regime functional stability};
+\draw[arr, dashed] (kan.south) -- (interp.north);
+\draw[arr, dashed] (interp.east) -| (fusion.south west);
+\end{tikzpicture}
