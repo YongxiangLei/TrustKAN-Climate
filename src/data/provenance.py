@@ -45,6 +45,31 @@ def temporal_continuity_summary(dates, expected_frequency: str) -> dict:
     }
 
 
+def fixed_window_continuity_summary(dates, expected_frequency: str, start, end) -> dict:
+    """Measure completeness against pre-specified bounds, including edge gaps."""
+    start = pd.Timestamp(start)
+    end = pd.Timestamp(end)
+    if end < start:
+        raise ValueError("end must not precede start")
+    summary = temporal_continuity_summary(dates, expected_frequency)
+    observed_start = pd.Timestamp(summary["start"])
+    observed_end = pd.Timestamp(summary["end"])
+    if observed_start < start or observed_end > end:
+        raise ValueError("Timestamps must lie inside the fixed window")
+    aliases = {"daily": "1D", "hourly": "1h", "weekly": "7D"}
+    normalized_frequency = aliases.get(str(expected_frequency).lower(), expected_frequency)
+    step = pd.to_timedelta(normalized_frequency)
+    expected = int((end - start) / step) + 1
+    summary["required_window_start"] = start.isoformat()
+    summary["required_window_end"] = end.isoformat()
+    summary["expected_steps_in_required_window"] = expected
+    summary["completeness_fraction"] = float(summary["observations"] / expected)
+    summary["estimated_missing_steps_in_required_window"] = int(
+        expected - summary["observations"]
+    )
+    return summary
+
+
 def evaluate_temporal_eligibility(summary: dict, criteria: dict) -> dict:
     start = pd.Timestamp(summary["start"])
     end = pd.Timestamp(summary["end"])

@@ -1,0 +1,75 @@
+dataset:
+  key: ghcnd_frozen_v1
+  source: NOAA/NCEI GHCN-Daily by-station archives
+  inventory_url: https://www.ncei.noaa.gov/pub/data/ghcn/daily/ghcnd-inventory.txt
+  inventory_sha256: adecaf2efa1ca024835b293607ecc69139931e74d3b80364f8e5f01afdd32e44
+  inventory_accessed_at_utc: 2026-08-16T12:09:43Z
+  period:
+    start: 1950-01-01
+    end: 2024-12-31
+  elements: [TMAX, TMIN]
+  target:
+    name: daily_midrange_temperature
+    formula: (TMAX + TMIN) / 2
+    unit: degC
+  quality_control:
+    reject_missing_sentinel: -9999
+    reject_nonempty_q_flag: true
+    reject_tmax_below_tmin: true
+    pair_dates_by: inner_join
+  eligibility:
+    minimum_span_years: 70
+    minimum_paired_completeness: 0.95
+    maximum_gap_steps: 31
+  selection:
+    candidates_per_region: 50
+    rule: first_eligible_in_inventory_coverage_rank
+    ranking: [earliest_paired_start, latest_paired_end, station_id]
+    model_performance_used: false
+
+stations:
+  - region: north_america_midlatitude
+    station_id: USW00014734
+    candidate_rank: 1
+    latitude: 40.6828
+    longitude: -74.1692
+    raw_sha256: 5fcecea307e4561ba6ffaa0cf0fc5388147f427e47b6607b6c64545152e8f95e
+    observations: 27394
+    completeness_fraction: 1.0
+    max_gap_steps: 1.0
+  - region: europe
+    station_id: UK000056225
+    candidate_rank: 1
+    latitude: 51.7667
+    longitude: -1.2667
+    raw_sha256: 9010aec9970d41d642d2c5f8727f169c04227a98c2aac4317d5419c099f7cd63
+    observations: 26552
+    completeness_fraction: 0.9692633423377381
+    max_gap_steps: 22.0
+  - region: east_asia
+    station_id: RSM00031915
+    candidate_rank: 2
+    latitude: 44.4
+    longitude: 131.3831
+    raw_sha256: fcfb2d960f86559de77f5e1a17fedef67da50210fd655cc49e98b48fd55a815f
+    observations: 27123
+    completeness_fraction: 0.9901073227714098
+    max_gap_steps: 23.0
+  - region: tropics
+    station_id: ASN00014015
+    candidate_rank: 9
+    latitude: -12.4239
+    longitude: 130.8925
+    raw_sha256: 633b4fa18313ad738dd89528e1c0956919d6d94c9b4cb44e2c44e5c4b1ad206b
+    observations: 27318
+    completeness_fraction: 0.9972256698547127
+    max_gap_steps: 19.0
+  - region: southern_midlatitudes
+    station_id: ASN00094029
+    candidate_rank: 2
+    latitude: -42.8897
+    longitude: 147.3278
+    raw_sha256: db7774375ab07ee366f562b4bb43ce11f1cb58c5c95926fc9f76d35bc072ef7b
+    observations: 27351
+    completeness_fraction: 0.9984303132072717
+    max_gap_steps: 3.0

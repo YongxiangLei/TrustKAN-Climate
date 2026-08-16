@@ -76,18 +76,18 @@ Paired model comparisons follow the dependence-aware protocol in
 `docs/STATISTICAL_PROTOCOL.md`; overlapping forecast origins are evaluated with
 moving-block bootstrap rather than IID resampling.
 
-GHCN station archives must pass the pre-registered data-quality gate before any
-headline run:
+The paper-grade GHCN station panel is selected and audited without consulting
+model performance:
 
 ```bash
-python scripts/audit_ghcn.py \
-  --config configs/datasets/ghcn_example.yaml \
-  --out results/dataset_audits/ghcn_example.json \
-  --require-eligible
+python scripts/select_ghcn_candidates.py
+python scripts/audit_ghcn_candidates.py --require-complete
 ```
 
-The included station/element pair is explicitly an engineering example and
-currently fails the 30-year eligibility threshold; it is not a paper dataset.
+The five frozen stations, raw archive hashes, fixed period, quality controls,
+and observed eligibility evidence are tracked in
+`configs/datasets/ghcn_frozen.yaml`. The separate `ghcn_example.yaml` remains a
+negative engineering example and is not a paper dataset.
 
 For reliability experiments, prepare an `.npz` split containing `x_train`, `y_train`, `x_val`, `y_val`, `x_cal`, `y_cal`, `x_test`, and `y_test`, then run:
 

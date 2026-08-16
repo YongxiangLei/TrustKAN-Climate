@@ -24,7 +24,26 @@ Scientific role: independent station-based temperature/weather generalization ou
 Authoritative source: NOAA National Centers for Environmental Information.
 Landing page: https://www.ncei.noaa.gov/products/land-based-station/global-historical-climatology-network-daily
 Characteristics: daily station climate summaries with maximum/minimum temperature, precipitation and additional elements; NOAA reports more than 100,000 stations across 180 countries and territories on the current product page.
-Protocol still to freeze: objective station inclusion rule based on record length/completeness and fixed geographic selection. No station may be selected according to model performance.
+Frozen protocol: use five fixed geographic strata and derive daily midrange
+temperature as `(TMAX + TMIN) / 2` after NOAA quality-flag filtering and an
+inner date join. Candidates must advertise paired inventory coverage over
+1950--2024. Within each stratum they are ranked by earliest paired start,
+latest paired end, and station ID. Candidates are audited in that order, and
+the first station passing 70 years of paired coverage, 95% fixed-window
+completeness, and a maximum 31-day observation interval is frozen. Model
+performance is never consulted.
+
+The frozen v1 stations are `USW00014734` (North America), `UK000056225`
+(Europe), `RSM00031915` (East Asia), `ASN00014015` (tropics), and
+`ASN00094029` (southern midlatitudes). Their coordinates, candidate ranks,
+quality statistics, and raw archive SHA-256 values are recorded in
+`configs/datasets/ghcn_frozen.yaml`.
+
+The initial five-candidate audit found no eligible tropical station. Before
+running any model comparison, the same deterministic ranking was extended to a
+maximum of 50 candidates; the first eligible tropical station occurred at rank
+9. This eligibility-only extension is disclosed so the selection history is
+auditable.
 
 The repository's engineering example (`USW00094728`, `TAVG`, requested period
 1950--2024) was audited on 2026-08-16. The retained element spans only
@@ -37,6 +56,18 @@ to demonstrate that dataset gates are enforced rather than bypassed.
 SHA-256 and access timestamp, parses the documented eight-column station format,
 rejects `-9999` sentinels and non-empty NOAA quality flags, quantifies calendar
 gaps, and can fail closed with `--require-eligible`.
+
+The multi-region selection can be reproduced with:
+
+```bash
+python scripts/select_ghcn_candidates.py
+python scripts/audit_ghcn_candidates.py --require-complete
+```
+
+The inventory snapshot used for v1 has SHA-256
+`adecaf2efa1ca024835b293607ecc69139931e74d3b80364f8e5f01afdd32e44`.
+Audit JSON files and raw station archives are generated locally and ignored by
+Git; the compact frozen configuration is tracked.
 
 ### MPI-BGC Jena Beutenberg weather station
 Scientific role: high-frequency multivariate forecasting under a very different sampling regime.

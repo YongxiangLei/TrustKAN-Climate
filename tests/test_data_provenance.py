@@ -3,7 +3,11 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from src.data.provenance import evaluate_temporal_eligibility, temporal_continuity_summary
+from src.data.provenance import (
+    evaluate_temporal_eligibility,
+    fixed_window_continuity_summary,
+    temporal_continuity_summary,
+)
 
 
 def test_temporal_summary_quantifies_daily_gap():
@@ -15,6 +19,16 @@ def test_temporal_summary_quantifies_daily_gap():
     assert summary["non_regular_intervals"]==1
     assert summary["max_gap_steps"]==2.0
     assert summary["completeness_fraction"]==0.75
+
+
+def test_fixed_window_summary_counts_missing_edges():
+    dates=pd.to_datetime(["2020-01-02","2020-01-03"])
+    summary=fixed_window_continuity_summary(
+        dates,"daily","2020-01-01","2020-01-04"
+    )
+    assert summary["expected_steps_in_required_window"]==4
+    assert summary["estimated_missing_steps_in_required_window"]==2
+    assert summary["completeness_fraction"]==0.5
 
 
 def test_temporal_summary_accepts_semantic_frequency_alias():

@@ -1,0 +1,39 @@
+dataset:
+  key: ghcnd
+  inventory_url: https://www.ncei.noaa.gov/pub/data/ghcn/daily/ghcnd-inventory.txt
+  elements: [TMAX, TMIN]
+  derived_target: daily_midrange_temperature
+  required_start_year: 1950
+  required_end_year: 2024
+  candidates_per_region: 50
+  eligibility:
+    minimum_span_years: 70
+    minimum_paired_completeness: 0.95
+    maximum_gap_steps: 31
+
+regions:
+  - name: north_america_midlatitude
+    latitude_min: 25
+    latitude_max: 60
+    longitude_min: -130
+    longitude_max: -60
+  - name: europe
+    latitude_min: 35
+    latitude_max: 70
+    longitude_min: -15
+    longitude_max: 40
+  - name: east_asia
+    latitude_min: 20
+    latitude_max: 50
+    longitude_min: 100
+    longitude_max: 150
+  - name: tropics
+    latitude_min: -15
+    latitude_max: 15
+    longitude_min: -180
+    longitude_max: 180
+  - name: southern_midlatitudes
+    latitude_min: -50
+    latitude_max: -20
+    longitude_min: -180
+    longitude_max: 180
