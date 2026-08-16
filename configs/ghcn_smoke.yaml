@@ -1,0 +1,38 @@
+experiment:
+  name: ghcn_smoke
+
+dataset:
+  panel_config: configs/datasets/ghcn_frozen.yaml
+  prepared_dir: results/prepared/ghcn_frozen_v1
+  frequency: 1D
+  station_regions: [north_america_midlatitude, europe]
+  # Engineering-only tail subset; never use this configuration for paper results.
+  max_observations: 2000
+
+protocols: [within_station, leave_one_region_out]
+
+window:
+  history: 14
+  horizons: [1]
+
+split:
+  train: 0.60
+  validation: 0.15
+  calibration: 0.10
+  test: 0.15
+
+training:
+  seeds: [11]
+  batch_size: 64
+  epochs: 1
+  patience: 1
+  learning_rate: 0.001
+  optimizer: adamw
+  weight_decay: 0.01
+
+models: [persistence, svr, mlp, trustkan]
+
+model_search:
+  svr:
+    - {c: 1.0, epsilon: 0.1, gamma: scale}
+    - {c: 10.0, epsilon: 0.1, gamma: scale}

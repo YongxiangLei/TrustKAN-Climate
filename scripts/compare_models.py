@@ -29,6 +29,16 @@ REQUIRED = {
     "config_sha256",
     "code_sha256",
 }
+OPTIONAL_PAIRED_METADATA = {
+    "protocol",
+    "target_region",
+    "target_station",
+    "source_regions_json",
+    "source_stations_json",
+    "source_pooling",
+    "normalization",
+    "dataset_sha256",
+}
 
 
 def load_artifact(path):
@@ -36,7 +46,8 @@ def load_artifact(path):
         missing = REQUIRED - set(source.files)
         if missing:
             raise ValueError(f"Artifact {path} is missing fields: {sorted(missing)}")
-        return {key: np.array(source[key], copy=True) for key in REQUIRED}
+        fields = REQUIRED | (OPTIONAL_PAIRED_METADATA & set(source.files))
+        return {key: np.array(source[key], copy=True) for key in fields}
 
 
 def scalar(artifact, key):
@@ -52,6 +63,11 @@ def validate_pair(a, b):
         raise ValueError("Artifacts do not share identical target origins")
     for field in ("dataset", "horizon", "split", "config_sha256", "code_sha256"):
         if scalar(a, field) != scalar(b, field):
+            raise ValueError(f"Artifact metadata mismatch for {field}")
+    for field in OPTIONAL_PAIRED_METADATA:
+        if (field in a) != (field in b):
+            raise ValueError(f"Artifact metadata presence mismatch for {field}")
+        if field in a and scalar(a, field) != scalar(b, field):
             raise ValueError(f"Artifact metadata mismatch for {field}")
     seed_a, seed_b = int(scalar(a, "seed")), int(scalar(b, "seed"))
     if seed_a != seed_b and seed_a >= 0 and seed_b >= 0:
@@ -88,6 +104,11 @@ def main(a_path, b_path, out, *, n_boot=5000, confidence=0.95, block_length=None
             "seed_b": int(scalar(b, "seed")),
             "config_sha256": str(scalar(a, "config_sha256")),
             "code_sha256": str(scalar(a, "code_sha256")),
+            **{
+                field: str(scalar(a, field))
+                for field in sorted(OPTIONAL_PAIRED_METADATA)
+                if field in a
+            },
         },
         "primary_block_bootstrap": {
             "mae_difference_a_minus_b": paired_block_bootstrap_difference(

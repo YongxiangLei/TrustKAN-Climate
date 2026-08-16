@@ -11,6 +11,7 @@ results/raw/*.npz
 results/aggregated/*.csv
 results/aggregated/*.json
 results/aggregated/*_config.yaml
+results/aggregated/*_panel.yaml
 results/raw/
 results/tables/
 results/runs/

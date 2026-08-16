@@ -8,7 +8,9 @@ from pathlib import Path
 import numpy as np
 
 
-def write_artifact(path, *, model, seed, prediction_offset, time_offset=0):
+def write_artifact(
+    path, *, model, seed, prediction_offset, time_offset=0, protocol="within_station"
+):
     target = np.arange(12, dtype=float).reshape(6, 2)
     times = np.arange(12, dtype="timedelta64[D]").reshape(6, 2)
     times = np.datetime64("2020-01-01") + times + np.timedelta64(time_offset, "D")
@@ -25,6 +27,7 @@ def write_artifact(path, *, model, seed, prediction_offset, time_offset=0):
         split=np.asarray("test"),
         config_sha256=np.asarray("config"),
         code_sha256=np.asarray("code"),
+        protocol=np.asarray(protocol),
     )
 
 
@@ -82,3 +85,27 @@ def test_comparison_script_rejects_different_target_timestamps(tmp_path):
     )
     assert result.returncode != 0
     assert "identical target timestamps" in result.stderr
+
+
+def test_comparison_script_rejects_cross_protocol_pairing(tmp_path):
+    root = Path(__file__).resolve().parents[1]
+    artifact_a, artifact_b = tmp_path / "a.npz", tmp_path / "b.npz"
+    write_artifact(
+        artifact_a,model="a",seed=11,prediction_offset=0.1,protocol="within_station"
+    )
+    write_artifact(
+        artifact_b,
+        model="b",
+        seed=11,
+        prediction_offset=0.2,
+        protocol="leave_one_region_out",
+    )
+    result = subprocess.run(
+        command(root, artifact_a, artifact_b, tmp_path / "comparison.json"),
+        cwd=root,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode != 0
+    assert "metadata mismatch for protocol" in result.stderr

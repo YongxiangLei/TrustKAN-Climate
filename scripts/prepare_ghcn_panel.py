@@ -11,7 +11,10 @@ from pathlib import Path
 import numpy as np
 import yaml
 
-import _bootstrap  # noqa: F401  # repository-root import setup
+try:
+    import _bootstrap  # noqa: F401  # file-path execution
+except ModuleNotFoundError:
+    from scripts import _bootstrap  # noqa: F401  # module execution
 from src.data.ghcn import (
     download_ghcn_archive,
     prepare_ghcn_temperature_pair,

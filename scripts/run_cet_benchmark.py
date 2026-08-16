@@ -17,7 +17,10 @@ import torch
 from torch.utils.data import DataLoader, TensorDataset
 import yaml
 
-import _bootstrap  # noqa: F401  # repository-root import setup
+try:
+    import _bootstrap  # noqa: F401  # file-path execution
+except ModuleNotFoundError:
+    from scripts import _bootstrap  # noqa: F401  # module execution
 from src.data.timeseries import (
     TrainOnlyStandardizer,
     assign_windows_by_target_origin,

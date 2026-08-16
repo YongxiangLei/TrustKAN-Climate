@@ -105,3 +105,6 @@ Dataset inclusion/exclusion criteria must be fixed before headline model compari
 - ERA5: multivariate reanalysis, wider geographic/temporal shift and stress testing.
 
 This combination is intended to test different scientific regimes rather than provide four near-duplicate datasets.
+
+The executable forecasting design for the frozen GHCN panel is specified in
+`docs/GHCN_BENCHMARK_PROTOCOL.md`.

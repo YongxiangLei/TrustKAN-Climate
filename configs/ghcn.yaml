@@ -1,0 +1,52 @@
+experiment:
+  name: ghcn_full
+
+dataset:
+  panel_config: configs/datasets/ghcn_frozen.yaml
+  prepared_dir: results/prepared/ghcn_frozen_v1
+  frequency: 1D
+
+protocols: [within_station, leave_one_region_out]
+
+window:
+  # Strictly contiguous daily history; no interpolation across missing observations.
+  history: 30
+  horizons: [1, 7, 30]
+
+split:
+  train: 0.60
+  validation: 0.15
+  calibration: 0.10
+  test: 0.15
+
+training:
+  seeds: [11, 22, 33, 44, 55]
+  batch_size: 64
+  epochs: 100
+  patience: 10
+  learning_rate: 0.001
+  optimizer: adamw
+  weight_decay: 0.01
+
+models:
+  - persistence
+  - svr
+  - random_forest
+  - mlp
+  - lstm
+  - gru
+  - tcn
+  - transformer
+  - kan
+  - trustkan
+
+model_search:
+  svr:
+    - {c: 1.0, epsilon: 0.05, gamma: scale}
+    - {c: 10.0, epsilon: 0.05, gamma: scale}
+    - {c: 10.0, epsilon: 0.1, gamma: scale}
+    - {c: 100.0, epsilon: 0.1, gamma: scale}
+  random_forest:
+    - {n_estimators: 300, max_depth: 12, min_samples_leaf: 1}
+    - {n_estimators: 300, max_depth: 24, min_samples_leaf: 1}
+    - {n_estimators: 300, max_depth: null, min_samples_leaf: 1}

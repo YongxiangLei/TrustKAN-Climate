@@ -83,6 +83,7 @@ model performance:
 python scripts/select_ghcn_candidates.py
 python scripts/audit_ghcn_candidates.py --require-complete
 python scripts/prepare_ghcn_panel.py
+python scripts/audit_ghcn_windows.py --config configs/ghcn.yaml
 ```
 
 The five frozen stations, raw archive hashes, fixed period, quality controls,
@@ -92,6 +93,31 @@ negative engineering example and is not a paper dataset.
 The preparation command creates one checksum-locked `.npz` artifact per region
 and a manifest under `results/dataset_audits/`; both are generated evidence and
 are intentionally excluded from Git.
+
+Validate both GHCN evaluation paths with the engineering-only smoke run:
+
+```bash
+python scripts/run_ghcn_benchmark.py --config configs/ghcn_smoke.yaml
+python scripts/aggregate_results.py \
+  --input results/aggregated/ghcn_smoke_runs.csv \
+  --outdir results/tables/ghcn_smoke
+```
+
+The paper protocol uses all five regions, 1/7/30-day horizons and five neural
+seeds:
+
+```bash
+python scripts/run_ghcn_benchmark.py --config configs/ghcn.yaml --resume
+python scripts/aggregate_results.py \
+  --input results/aggregated/ghcn_full_runs.csv \
+  --outdir results/tables/ghcn_full \
+  --min-seeds 5 \
+  --min-regions 5
+```
+
+It includes separate within-station and leave-one-region-out parameter-transfer
+tasks. Exact leakage controls and reporting rules are defined in
+`docs/GHCN_BENCHMARK_PROTOCOL.md`.
 
 For reliability experiments, prepare an `.npz` split containing `x_train`, `y_train`, `x_val`, `y_val`, `x_cal`, `y_cal`, `x_test`, and `y_test`, then run:
 

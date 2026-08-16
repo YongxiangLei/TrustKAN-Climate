@@ -56,9 +56,10 @@ The repository provides `adjust_pvalues(..., method="holm" | "bh")`.
 
 `scripts/compare_models.py` refuses a paired comparison unless target values,
 timestamps, origins, dataset, horizon, split, configuration fingerprint and
-source-code fingerprint agree. For two stochastic models, seeds must also
-match. Each output records the two input artifact paths and all relevant
-fingerprints.
+source-code fingerprint agree. When present, geographic protocol, held-out
+region/station, source panel, normalization rule, and dataset fingerprint must
+also agree. For two stochastic models, seeds must also match. Each output
+records the two input artifact paths and all relevant fingerprints.
 
 Example:
 
