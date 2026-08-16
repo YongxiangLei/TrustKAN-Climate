@@ -147,6 +147,20 @@ Marginal versus simultaneous coverage, target calibration in geographic
 transfer, and selective-risk rules are frozen in
 `docs/GHCN_RELIABILITY_PROTOCOL.md`.
 
+The complete GHCN paper matrix contains 1,410 atomic runs. Generate a
+checksum-bound, safely shardable campaign instead of editing full configs:
+
+```bash
+python scripts/plan_ghcn_campaign.py \
+  --outdir results/campaigns/ghcn_publication
+python scripts/audit_ghcn_campaign.py \
+  --campaign results/campaigns/ghcn_publication/campaign.json \
+  --out results/campaigns/ghcn_publication/progress.json
+```
+
+See `docs/GHCN_CAMPAIGN.md` for distributed execution, final collection, and
+the mandatory completion audit.
+
 For reliability experiments, prepare an `.npz` split containing `x_train`, `y_train`, `x_val`, `y_val`, `x_cal`, `y_cal`, `x_test`, and `y_test`, then run:
 
 ```bash

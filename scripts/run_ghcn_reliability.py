@@ -93,6 +93,29 @@ def validate_reliability_config(cfg, config_path):
     return run_name
 
 
+def validate_execution_filters(
+    cfg, station_series, *, protocols=None, regions=None, horizons=None, seeds=None
+):
+    available = {
+        "protocol": set(cfg["protocols"]),
+        "region": {series.region for series in station_series},
+        "horizon": set(cfg["window"]["horizons"]),
+        "seed": set(cfg["training"]["seeds"]),
+    }
+    requested = {
+        "protocol": protocols,
+        "region": regions,
+        "horizon": horizons,
+        "seed": seeds,
+    }
+    for name, values in requested.items():
+        if values is None:
+            continue
+        unknown = set(values) - available[name]
+        if unknown:
+            raise ValueError(f"Unknown {name} execution filters: {sorted(unknown)}")
+
+
 def _json_safe(value):
     if isinstance(value, dict):
         return {str(key): _json_safe(item) for key, item in value.items()}
@@ -118,6 +141,42 @@ def atomic_json(path, payload):
     finally:
         if temporary.exists():
             temporary.unlink()
+
+
+def atomic_csv(frame, path):
+    path = Path(path)
+    temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    try:
+        frame.to_csv(temporary, index=False)
+        os.replace(temporary, path)
+    finally:
+        if temporary.exists():
+            temporary.unlink()
+
+
+def atomic_yaml(path, payload):
+    path = Path(path)
+    temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    try:
+        with open(temporary, "w", encoding="utf-8") as handle:
+            yaml.safe_dump(payload, handle, sort_keys=False)
+        os.replace(temporary, path)
+    finally:
+        if temporary.exists():
+            temporary.unlink()
+
+
+def collect_current_records(record_dir, config_hash, source_hash):
+    rows = []
+    for path in sorted(Path(record_dir).glob("*.json")):
+        with open(path, "r", encoding="utf-8") as handle:
+            row = json.load(handle)
+        if (
+            row.get("config_sha256") == config_hash
+            and row.get("code_sha256") == source_hash
+        ):
+            rows.append(row)
+    return rows
 
 
 def reference_subset(train_set, maximum):
@@ -181,13 +240,15 @@ def record_from_metrics(row, metrics, calibration_state):
     )
 
 
-def run_spec(cfg, spec, horizon, paths, hashes, resume):
+def run_spec(cfg, spec, horizon, paths, hashes, resume, *, selected_seeds=None):
     raw_dir, record_dir = paths
     cfg_hash, source_hash, panel_hash = hashes
     data_hash = dataset_sha256(spec, panel_hash)
     rows = []
     quantiles = tuple(float(value) for value in cfg["model"]["quantiles"])
     for seed in cfg["training"]["seeds"]:
+        if selected_seeds is not None and seed not in selected_seeds:
+            continue
         stem = f"{spec.dataset}_trustkan_reliability_h{horizon}_s{seed}"
         artifact = raw_dir / f"{stem}.npz"
         record = record_dir / f"{stem}.json"
@@ -358,10 +419,30 @@ def run_spec(cfg, spec, horizon, paths, hashes, resume):
     return rows
 
 
-def main(config, resume=False):
+def main(
+    config,
+    resume=False,
+    *,
+    protocols=None,
+    regions=None,
+    horizons=None,
+    seeds=None,
+    collect_only=False,
+    defer_collection=False,
+):
+    if collect_only and defer_collection:
+        raise ValueError("--collect-only and --defer-collection are mutually exclusive")
     cfg = load_config(config)
     run_name = validate_reliability_config(cfg, config)
     panel_path, panel, station_series = load_station_panel(cfg)
+    validate_execution_filters(
+        cfg,
+        station_series,
+        protocols=protocols,
+        regions=regions,
+        horizons=horizons,
+        seeds=seeds,
+    )
     cfg_hash = combined_config_sha256(config, panel_path)
     source_hash = code_sha256()
     panel_hash = file_sha256(panel_path)
@@ -371,13 +452,13 @@ def main(config, resume=False):
     raw_dir.mkdir(parents=True, exist_ok=True)
     record_dir.mkdir(parents=True, exist_ok=True)
     aggregate_dir.mkdir(parents=True, exist_ok=True)
-    with open(aggregate_dir / f"{run_name}_config.yaml", "w", encoding="utf-8") as handle:
-        yaml.safe_dump(cfg, handle, sort_keys=False)
-    with open(aggregate_dir / f"{run_name}_panel.yaml", "w", encoding="utf-8") as handle:
-        yaml.safe_dump(panel, handle, sort_keys=False)
+    atomic_yaml(aggregate_dir / f"{run_name}_config.yaml", cfg)
+    atomic_yaml(aggregate_dir / f"{run_name}_panel.yaml", panel)
 
-    rows = []
-    for horizon in cfg["window"]["horizons"]:
+    selected_rows = []
+    for horizon in ([] if collect_only else cfg["window"]["horizons"]):
+        if horizons is not None and horizon not in horizons:
+            continue
         bundles = [
             build_station_windows(
                 series,
@@ -389,8 +470,13 @@ def main(config, resume=False):
             )
             for series in station_series
         ]
-        for spec in build_evaluation_specs(bundles, cfg["protocols"]):
-            rows.extend(
+        selected_protocols = (
+            cfg["protocols"] if protocols is None else protocols
+        )
+        for spec in build_evaluation_specs(bundles, selected_protocols):
+            if regions is not None and spec.target_region not in regions:
+                continue
+            selected_rows.extend(
                 run_spec(
                     cfg,
                     spec,
@@ -398,10 +484,24 @@ def main(config, resume=False):
                     (raw_dir, record_dir),
                     (cfg_hash, source_hash, panel_hash),
                     resume,
+                    selected_seeds=seeds,
                 )
             )
+    if not collect_only:
+        if not selected_rows:
+            raise RuntimeError("No reliability jobs matched the execution filters")
+        failed_count = sum(row["status"] != "ok" for row in selected_rows)
+        if failed_count:
+            raise RuntimeError(
+                f"{failed_count} reliability runs failed; inspect their run records"
+            )
+        if defer_collection:
+            return
+    rows = collect_current_records(record_dir, cfg_hash, source_hash)
+    if not rows:
+        raise RuntimeError("No current reliability records are available to collect")
     result = pd.DataFrame(rows)
-    result.to_csv(aggregate_dir / f"{run_name}_runs.csv", index=False)
+    atomic_csv(result, aggregate_dir / f"{run_name}_runs.csv")
     ok = result[result.status.eq("ok")]
     if not ok.empty:
         group = ["protocol", "dataset", "target_region", "horizon"]
@@ -413,9 +513,9 @@ def main(config, resume=False):
             interval_width_mean=("conformal_mean_width", "mean"),
             fused_aurc_mean=("fused_aurc", "mean"),
         )
-        summary.to_csv(aggregate_dir / f"{run_name}_summary.csv", index=False)
+        atomic_csv(summary, aggregate_dir / f"{run_name}_summary.csv")
         print(summary.to_string(index=False))
-    failed_count = int((~result.status.eq("ok")).sum())
+    failed_count = sum(row["status"] != "ok" for row in rows)
     if failed_count:
         raise RuntimeError(
             f"{failed_count} reliability runs failed; inspect the run ledger"
@@ -430,5 +530,28 @@ if __name__ == "__main__":
         action="store_true",
         help="Reuse only checksum-matched successful records and artifacts.",
     )
+    parser.add_argument("--protocol", action="append", dest="protocols")
+    parser.add_argument("--region", action="append", dest="regions")
+    parser.add_argument("--horizon", action="append", type=int, dest="horizons")
+    parser.add_argument("--seed", action="append", type=int, dest="seeds")
+    parser.add_argument(
+        "--collect-only",
+        action="store_true",
+        help="Rebuild ledgers from checksum-matched records without training.",
+    )
+    parser.add_argument(
+        "--defer-collection",
+        action="store_true",
+        help="Write atomic run records only; use --collect-only after all shards.",
+    )
     args = parser.parse_args()
-    main(args.config, args.resume)
+    main(
+        args.config,
+        args.resume,
+        protocols=args.protocols,
+        regions=args.regions,
+        horizons=args.horizons,
+        seeds=args.seeds,
+        collect_only=args.collect_only,
+        defer_collection=args.defer_collection,
+    )

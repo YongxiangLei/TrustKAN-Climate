@@ -72,6 +72,10 @@ unless a separately pre-registered hierarchical analysis is used.
 Publication aggregation must use both `--min-seeds 5` and `--min-regions 5`;
 the command fails if a model/protocol/horizon group has an incomplete panel.
 
+The frozen matrix may be routed into independent shards without changing the
+configuration. Execution filters, atomic records, collection rules, and the
+final checksum audit are specified in `docs/GHCN_CAMPAIGN.md`.
+
 TrustKAN interval calibration and selective prediction use the separate frozen
 protocol in `docs/GHCN_RELIABILITY_PROTOCOL.md`.
 

@@ -4,6 +4,11 @@ This project treats manuscript tables and figures as deterministic products of s
 
 ## 0. Produce and validate deterministic benchmark runs
 
+For the 1,410-run GHCN publication campaign, first generate the immutable shard
+manifest described in `docs/GHCN_CAMPAIGN.md`. Final collection must pass both
+the five-seed/five-region aggregators and the campaign audit with
+`--require-complete` before any values enter the manuscript.
+
 Full CET experiments write raw artifacts under `results/raw/cet_full/` and a
 run ledger to `results/aggregated/cet_full_runs.csv`. Smoke outputs are isolated
 under the `cet_smoke` namespace and are never publication candidates.

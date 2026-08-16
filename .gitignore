@@ -17,6 +17,7 @@ results/tables/
 results/runs/
 results/statistical_tests/
 results/dataset_audits/
+results/campaigns/
 results/prepared/
 results/reliability/
 checkpoints/

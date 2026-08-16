@@ -65,6 +65,22 @@ def test_ghcn_reliability_entrypoints_can_import_project():
         assert "--input" in result.stdout or "--config" in result.stdout
 
 
+def test_ghcn_campaign_planner_entrypoint_can_import_project():
+    expected = {
+        "plan_ghcn_campaign.py": "--benchmark-config",
+        "audit_ghcn_campaign.py": "--campaign",
+    }
+    for script, option in expected.items():
+        result = subprocess.run(
+            [sys.executable, f"scripts/{script}", "--help"],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0, result.stderr
+        assert option in result.stdout
+
+
 def test_generic_reliability_entrypoint_can_import_project():
     result = subprocess.run(
         [sys.executable, "scripts/run_trustkan_reliability.py", "--help"],
