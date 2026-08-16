@@ -1,0 +1,17 @@
+\section{Discussion}
+\label{sec:discussion}
+
+\subsection{What TrustKAN Adds Beyond Point Accuracy}
+The principal scientific question is not whether a KAN variant can obtain a marginally lower RMSE, but whether its internal representation and uncertainty machinery provide useful evidence about when forecasts remain reliable. The final discussion should therefore connect any deterministic gains to calibration, drift behaviour, reliability--error association, and selective risk. \todo{Replace this paragraph with evidence-backed interpretation after experiments are frozen.}
+
+\subsection{Interpretability versus Reliability}
+KAN functions can provide inspectable nonlinear relationships, but interpretability and reliability are distinct properties. Stable functions may aid scientific inspection without necessarily predicting future forecast error. Conversely, a useful shift or interval-width score may improve selective risk without being interpretable in a mechanistic sense. The final manuscript will keep these claims separate and only combine them when experiments support an incremental link.
+
+\subsection{Distribution Shift and Adaptive Calibration}
+Static conformal calibration is expected to be most appropriate when the calibration and deployment distributions remain sufficiently similar. Rolling or adaptive updates can respond to changing error processes, but may increase interval width or react slowly to abrupt shifts. The empirical trade-off between coverage stability and sharpness is therefore central to evaluating the adaptive component.
+
+\subsection{Limitations}
+Several limitations must be considered. First, climate and weather datasets differ in temporal resolution, variable composition, and measurement process, so results should not be interpreted as universal model rankings. Second, conformal guarantees depend on assumptions that may be violated under strong temporal dependence and nonstationarity. Third, Mahalanobis-type embedding distances capture only one form of representation shift. Fourth, KAN visualizations reveal learned associations rather than causal physical mechanisms. Finally, selective prediction is useful only when abstention or escalation is operationally meaningful.
+
+\subsection{Reproducibility and Scientific Integrity}
+All headline numerical claims should be generated from immutable experiment outputs. Failed runs, negative results, and datasets on which the proposed method underperforms should remain visible. Dataset and shift inclusion criteria are fixed before headline comparisons to reduce cherry-picking risk.
