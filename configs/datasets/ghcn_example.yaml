@@ -1,0 +1,14 @@
+dataset:
+  key: ghcn
+  station_id: USW00094728
+  element: TAVG
+  temporal_resolution: daily
+  target_unit: degC
+  selection_policy: "EXAMPLE ONLY — replace with pre-registered station selection before headline experiments"
+window:
+  history: 365
+  horizons: [1, 7, 30, 90]
+split:
+  train: 0.60
+  validation: 0.15
+  calibration: 0.10
