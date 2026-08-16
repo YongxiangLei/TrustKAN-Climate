@@ -1,0 +1,19 @@
+\section{Introduction}
+\label{sec:introduction}
+
+Data-driven climate and weather forecasting has benefited from rapid progress in deep temporal models, including recurrent networks, attention-based architectures, state-space models, and more recently Kolmogorov--Arnold Networks (KANs). However, improved point accuracy alone is insufficient for scientific and operational use. Forecast systems are deployed across changing regimes, imperfect observations, nonstationary seasonal patterns, and distribution shifts that can invalidate assumptions learned from historical data. Under these conditions, a model should not only predict accurately but also reveal relevant nonlinear relationships, quantify predictive uncertainty, detect when the current regime differs from calibration experience, and reduce reliance on predictions that are likely to be unreliable.
+
+KAN-based predictors are particularly attractive because learnable univariate functions can expose nonlinear response structure more directly than conventional multilayer perceptrons. Yet the presence of KAN layers does not by itself establish trustworthy forecasting. Three gaps remain important. First, interpretability must be demonstrated through stable, inspectable functional relationships rather than asserted from architecture alone. Second, probabilistic uncertainty must be empirically calibrated, including under temporal shift. Third, model confidence should be connected to actionable reliability, for example through selective prediction that trades forecast coverage against risk.
+
+This work develops \method, a unified framework for interpretable and reliability-aware climate forecasting. The proposed system combines a temporal KAN representation with point and quantile prediction, conformal calibration, representation-level shift assessment, and a reliability score used for selective prediction. A dedicated calibration partition is retained between model validation and final testing so that conformal correction and abstention thresholds are selected without using final test outcomes.
+
+The intended contributions are as follows:
+\begin{itemize}
+    \item We develop a temporal KAN forecasting architecture that preserves nonlinear functional structure while modelling temporal dependence for multi-horizon climate prediction.
+    \item We integrate quantile prediction with static, rolling, and adaptive conformal calibration to evaluate whether predictive coverage can be maintained as data distributions evolve.
+    \item We formulate reliability using uncertainty width and representation-shift evidence, and evaluate whether the resulting score is associated with realized forecast error rather than treating confidence as self-validating.
+    \item We introduce reliability-based selective forecasting and evaluate the risk--coverage trade-off, including whether abstention removes disproportionately high-error predictions.
+    \item We design a multi-dataset, multi-horizon evaluation protocol with strong classical, neural, KAN, and state-space baselines, multiple random seeds, statistical comparison, robustness analysis, computational evaluation, and explicit failure-case reporting.
+\end{itemize}
+
+The paper is organized as follows. Section~\ref{sec:related} reviews relevant work. Section~\ref{sec:method} presents \method. Section~\ref{sec:experiments} defines the datasets and evaluation protocol. Section~\ref{sec:results} reports empirical results, followed by discussion and limitations in Section~\ref{sec:discussion}.
