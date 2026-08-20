@@ -22,7 +22,7 @@ def temporal_continuity_summary(dates, expected_frequency: str) -> dict:
         raise ValueError("Cannot summarize an empty timestamp sequence")
     if not index.is_monotonic_increasing or index.has_duplicates:
         raise ValueError("Timestamps must be sorted and unique")
-    aliases = {"daily": "1D", "hourly": "1h", "weekly": "7D"}
+    aliases = {"daily": "1D", "hourly": "1h", "weekly": "7D", "10min": "10min"}
     normalized_frequency = aliases.get(str(expected_frequency).lower(), expected_frequency)
     step = pd.to_timedelta(normalized_frequency)
     if step <= pd.Timedelta(0):
@@ -56,7 +56,7 @@ def fixed_window_continuity_summary(dates, expected_frequency: str, start, end) 
     observed_end = pd.Timestamp(summary["end"])
     if observed_start < start or observed_end > end:
         raise ValueError("Timestamps must lie inside the fixed window")
-    aliases = {"daily": "1D", "hourly": "1h", "weekly": "7D"}
+    aliases = {"daily": "1D", "hourly": "1h", "weekly": "7D", "10min": "10min"}
     normalized_frequency = aliases.get(str(expected_frequency).lower(), expected_frequency)
     step = pd.to_timedelta(normalized_frequency)
     expected = int((end - start) / step) + 1

@@ -11,6 +11,7 @@ from src.data.ghcn import (
     read_ghcn_inventory,
 )
 from src.data.era5 import era5_timeseries_request
+from src.data.jena import official_column_map
 
 
 def test_ghcn_url_validation():
@@ -105,3 +106,10 @@ def test_era5_request_shape():
     assert r["year"]==["2020"]
     assert len(r["time"])==24
     assert r["location"]["latitude"]==50.91
+
+
+def test_jena_official_column_map_is_frozen():
+    mapping=official_column_map()
+    assert mapping["target"]=="T (degC)"
+    assert mapping["required"][0]=="T (degC)"
+    assert "p (mbar)" in mapping["required"]

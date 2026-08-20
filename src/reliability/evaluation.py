@@ -29,7 +29,10 @@ from src.uncertainty.conformal import (
 
 
 def inverse_standardized(scaler, values):
+    """Invert standardized targets using the training-only target column."""
     values = np.asarray(values, dtype=float)
+    if hasattr(scaler, "inverse_column"):
+        return scaler.inverse_column(values, 0)
     shape = values.shape
     return scaler.scaler.inverse_transform(values.reshape(-1, 1)).reshape(shape)
 

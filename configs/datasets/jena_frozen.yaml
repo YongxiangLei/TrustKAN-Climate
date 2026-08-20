@@ -1,0 +1,59 @@
+dataset:
+  key: jena_frozen_v1
+  source: MPI-BGC Jena Beutenberg weather station
+  landing_page: https://weather.bgc-jena.mpg.de/weather_data.html
+  station_page: https://www.bgc-jena.mpg.de/en/servicegroups/fieldexperiements/locations/beutenberg
+  license: CC-BY-4.0
+  latitude: 50.91
+  longitude: 11.56
+  raw_resolution: 10min
+  model_resolution: hourly
+  period:
+    start: "2010-01-01T00:00:00"
+    end: "2020-12-31T23:00:00"
+  target:
+    name: air_temperature
+    column: "T (degC)"
+    unit: degC
+  covariates:
+    - {column: "T (degC)", role: lagged_target, aggregation: mean}
+    - {column: "p (mbar)", role: pressure, aggregation: mean}
+    - {column: "rh (%)", role: relative_humidity, aggregation: mean}
+    - {column: "wv (m/s)", role: wind_speed, aggregation: mean}
+  excluded_derived_columns:
+    - "Tpot (K)"
+    - "Tdew (degC)"
+    - "VPmax (mbar)"
+    - "VPact (mbar)"
+    - "VPdef (mbar)"
+    - "sh (g/kg)"
+    - "H2OC (mmol/mol)"
+    - "rho (g/m**3)"
+  quality_control:
+    missing_sentinel: -9999
+    min_valid_10min_slots_per_hour: 4
+    physical_ranges:
+      "T (degC)": [-40.0, 45.0]
+      "p (mbar)": [900.0, 1100.0]
+      "rh (%)": [0.0, 100.0]
+      "wv (m/s)": [0.0, 60.0]
+    interpolation: none
+    timezone_policy: retain_naive_local_timestamps
+  eligibility:
+    minimum_span_years: 10
+    minimum_completeness: 0.95
+    maximum_gap_steps: 48
+  selection:
+    rule: single_official_station
+    model_performance_used: false
+    observed_continuity_recorded_after_audit: true
+
+window:
+  history: 168
+  horizons: [1, 6, 24]
+
+split:
+  train: 0.60
+  validation: 0.15
+  calibration: 0.10
+  test: 0.15

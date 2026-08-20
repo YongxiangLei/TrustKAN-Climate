@@ -88,6 +88,16 @@ class TrainOnlyStandardizer:
         out = self.scaler.transform(a)
         return out.reshape(original_shape)
 
+    def inverse_column(self, values, column: int = 0):
+        """Invert one standardized column using training-only moments."""
+        if not self._fitted:
+            raise RuntimeError("Standardizer must be fitted on training data first")
+        values = np.asarray(values, dtype=float)
+        n_features = len(self.scaler.mean_)
+        if column < 0 or column >= n_features:
+            raise ValueError("column is outside the fitted feature width")
+        return values * float(self.scaler.scale_[column]) + float(self.scaler.mean_[column])
+
 
 def assign_windows_by_target_origin(origins, split: TemporalSplit, horizon: int = 1):
     """Assign windows whose complete target lies within one split.

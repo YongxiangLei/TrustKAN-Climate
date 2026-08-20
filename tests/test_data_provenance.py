@@ -38,6 +38,13 @@ def test_temporal_summary_accepts_semantic_frequency_alias():
     assert summary["non_regular_intervals"]==0
 
 
+def test_temporal_summary_accepts_ten_minute_alias():
+    dates=pd.date_range("2020-01-01", periods=3, freq="10min")
+    summary=temporal_continuity_summary(dates,"10min")
+    assert summary["non_regular_intervals"]==0
+    assert summary["expected_steps_in_span"]==3
+
+
 def test_temporal_eligibility_reports_failed_pre_registered_check():
     summary=temporal_continuity_summary(
         pd.to_datetime(["2000-01-01","2000-01-02","2000-01-03"]),"daily"

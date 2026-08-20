@@ -126,26 +126,31 @@ def prepare_series(cfg, path):
     return frame[target_col].to_numpy(float), frame[date_col].to_numpy(dtype="datetime64[ns]")
 
 
-def build_model(name, history, horizon, seed=None, options=None):
+def build_model(name, history, horizon, seed=None, options=None, n_features=1):
     options = options or {}
+    n_features = int(n_features)
+    if n_features < 1:
+        raise ValueError("n_features must be positive")
     if name == "mlp":
-        return MLPForecaster(history, 1, horizon)
+        return MLPForecaster(history, n_features, horizon)
     if name == "lstm":
-        return RNNForecaster("lstm", 1, horizon)
+        return RNNForecaster("lstm", n_features, horizon)
     if name == "gru":
-        return RNNForecaster("gru", 1, horizon)
+        return RNNForecaster("gru", n_features, horizon)
     if name == "transformer":
-        return TransformerForecaster(1, horizon)
+        return TransformerForecaster(n_features, horizon)
     if name == "tcn":
-        return TCNForecaster(1, horizon)
+        return TCNForecaster(n_features, horizon)
     if name == "mamba":
-        return MambaForecaster(1, horizon)
+        return MambaForecaster(n_features, horizon)
     if name == "kan":
-        return StandardKANForecaster(history, 1, horizon)
+        return StandardKANForecaster(history, n_features, horizon)
     if name == "tem2kan":
+        if n_features != 1:
+            raise ValueError("Strict Tem2-KAN reproduction is univariate")
         return Tem2KANReference(history, 1, horizon, seed=1 if seed is None else seed)
     if name == "trustkan":
-        return TrustKAN(1, horizon=horizon, hidden_dim=64, grid_size=8)
+        return TrustKAN(n_features, horizon=horizon, hidden_dim=64, grid_size=8)
     if name == "svr":
         return make_svr(**options)
     if name == "random_forest":
@@ -207,7 +212,9 @@ def timed_prediction(function, n_samples, device=None):
     return prediction, elapsed * 1000.0 / max(1, n_samples)
 
 
-def select_classical_model(name, history, horizon, seed, train_set, val_set, candidates):
+def select_classical_model(
+    name, history, horizon, seed, train_set, val_set, candidates, n_features=1
+):
     if not isinstance(candidates, list) or not candidates or not all(
         isinstance(candidate, dict) for candidate in candidates
     ):
@@ -215,7 +222,7 @@ def select_classical_model(name, history, horizon, seed, train_set, val_set, can
     search = []
     selected = None
     for index, options in enumerate(candidates):
-        model = build_model(name, history, horizon, seed, options)
+        model = build_model(name, history, horizon, seed, options, n_features=n_features)
         start = time.perf_counter()
         model.fit(*train_set)
         fit_seconds = time.perf_counter() - start
@@ -266,7 +273,7 @@ def atomic_write_json(path, payload):
             temporary.unlink()
 
 
-def resumable_record(path, artifact, cfg_hash, source_hash):
+def resumable_record(path, artifact, cfg_hash, source_hash, data_hash=None):
     path = Path(path)
     if not path.is_file() or not Path(artifact).is_file():
         return None
@@ -278,14 +285,58 @@ def resumable_record(path, artifact, cfg_hash, source_hash):
         or row.get("code_sha256") != source_hash
     ):
         return None
+    if data_hash is not None and row.get("dataset_sha256") != data_hash:
+        return None
+    if row.get("artifact_sha256") != file_sha256(artifact):
+        return None
     return row
 
 
-def main(config, resume=False):
+def validate_execution_filters(cfg, *, horizons=None, models=None, seeds=None):
+    available = {
+        "horizon": set(cfg["window"]["horizons"]),
+        "model": set(cfg["models"]),
+        "seed": set(cfg["training"]["seeds"]) | {-1},
+    }
+    requested = {"horizon": horizons, "model": models, "seed": seeds}
+    for name, values in requested.items():
+        if values is None:
+            continue
+        unknown = set(values) - available[name]
+        if unknown:
+            raise ValueError(f"Unknown {name} execution filters: {sorted(unknown)}")
+
+
+def collect_current_records(record_dir, config_hash, source_hash):
+    rows = []
+    for path in sorted(Path(record_dir).glob("*.json")):
+        with open(path, "r", encoding="utf-8") as handle:
+            row = json.load(handle)
+        if row.get("config_sha256") == config_hash and row.get("code_sha256") == source_hash:
+            rows.append(row)
+    return rows
+
+
+def main(
+    config,
+    resume=False,
+    *,
+    horizons=None,
+    models=None,
+    seeds=None,
+    collect_only=False,
+    defer_collection=False,
+    device=None,
+):
+    if collect_only and defer_collection:
+        raise ValueError("--collect-only and --defer-collection are mutually exclusive")
     cfg = load_config(config)
     run_name = validate_config(cfg, config)
     cfg_hash = config_sha256(cfg)
     source_hash = code_sha256()
+    data_hash = str(cfg["dataset"].get("sha256", "")).lower()
+    validate_execution_filters(cfg, horizons=horizons, models=models, seeds=seeds)
+    resolved_device = resolve_device(device)
     path = ensure_data(cfg)
     values, dates = prepare_series(cfg, path)
     split = chronological_split(
@@ -306,9 +357,11 @@ def main(config, resume=False):
     with open(aggregated_dir / f"{run_name}_config.yaml", "w", encoding="utf-8") as handle:
         yaml.safe_dump(cfg, handle, sort_keys=False)
 
-    rows = []
+    selected_rows = []
     expected_step = pd.to_timedelta(cfg["dataset"]["frequency"]).to_timedelta64()
-    for horizon in cfg["window"]["horizons"]:
+    for horizon in ([] if collect_only else cfg["window"]["horizons"]):
+        if horizons is not None and horizon not in horizons:
+            continue
         x, y, origins = sliding_windows(
             standardized,
             cfg["window"]["history"],
@@ -324,11 +377,13 @@ def main(config, resume=False):
         target_times = np.stack([dates[origin : origin + horizon] for origin in test_origins])
 
         for name in cfg["models"]:
-            seeds = [-1] if name in DETERMINISTIC else cfg["training"]["seeds"]
-            execution_device = (
-                resolve_device(None) if name in NEURAL else resolve_device("cpu")
-            )
-            for seed in seeds:
+            if models is not None and name not in models:
+                continue
+            model_seeds = [-1] if name in DETERMINISTIC else cfg["training"]["seeds"]
+            execution_device = resolved_device if name in NEURAL else resolve_device("cpu")
+            for seed in model_seeds:
+                if seeds is not None and seed not in seeds:
+                    continue
                 set_seed(
                     seed if seed >= 0 else 0,
                     deterministic=cfg["training"]["deterministic_algorithms"],
@@ -338,9 +393,11 @@ def main(config, resume=False):
                 artifact = raw_dir / f"cet_{name}_h{horizon}_s{seed}.npz"
                 record = record_dir / f"cet_{name}_h{horizon}_s{seed}.json"
                 if resume:
-                    completed = resumable_record(record, artifact, cfg_hash, source_hash)
+                    completed = resumable_record(
+                        record, artifact, cfg_hash, source_hash, data_hash
+                    )
                     if completed is not None:
-                        rows.append(completed)
+                        selected_rows.append(completed)
                         print(f"RESUME {name} h={horizon} seed={seed}")
                         continue
                 row = {
@@ -361,9 +418,11 @@ def main(config, resume=False):
                     "n_test": len(test_x),
                     "config_sha256": cfg_hash,
                     "code_sha256": source_hash,
+                    "dataset_sha256": data_hash,
+                    "artifact_sha256": np.nan,
                     "artifact_path": artifact.as_posix(),
                     "record_path": record.as_posix(),
-                    "requested_device": "auto",
+                    "requested_device": str(device or "auto"),
                     **run_environment,
                 }
                 history = []
@@ -442,7 +501,8 @@ def main(config, resume=False):
                         split=np.asarray("test"),
                         config_sha256=np.asarray(cfg_hash),
                         code_sha256=np.asarray(source_hash),
-                        requested_device=np.asarray("auto"),
+                        dataset_sha256=np.asarray(data_hash),
+                        requested_device=np.asarray(str(device or "auto")),
                         environment_json=np.asarray(
                             json.dumps(run_environment, sort_keys=True)
                         ),
@@ -459,13 +519,25 @@ def main(config, resume=False):
                         validation_rmse=validation_rmse,
                         search_seconds=search_seconds,
                         selected_hyperparameters=json.dumps(selected_hyperparameters, sort_keys=True),
+                        artifact_sha256=file_sha256(artifact),
                     )
                 except Exception as exc:  # preserve failures in the run ledger
                     row.update(status="failed", error=f"{type(exc).__name__}: {exc}")
                     print(f"FAILED {name} h={horizon} seed={seed}: {exc}")
                 atomic_write_json(record, row)
-                rows.append(row)
+                selected_rows.append(row)
 
+    if not collect_only:
+        if not selected_rows:
+            raise RuntimeError("No CET jobs matched the execution filters")
+        failed = [row for row in selected_rows if row["status"] != "ok"]
+        if failed:
+            raise RuntimeError(f"{len(failed)} CET runs failed; inspect their run records")
+        if defer_collection:
+            return selected_rows
+    rows = collect_current_records(record_dir, cfg_hash, source_hash)
+    if not rows:
+        raise RuntimeError("No current CET records are available to collect")
     result = pd.DataFrame(rows)
     result.to_csv(aggregated_dir / f"{run_name}_runs.csv", index=False)
     ok = result[result.status == "ok"]
@@ -481,7 +553,8 @@ def main(config, resume=False):
     summary.to_csv(aggregated_dir / f"{run_name}_summary.csv", index=False)
     print(summary.to_string(index=False))
     with open(aggregated_dir / f"{run_name}_environment.json", "w", encoding="utf-8") as handle:
-        json.dump(environment(), handle, indent=2)
+        json.dump(environment(resolved_device), handle, indent=2)
+    return rows
 
 
 if __name__ == "__main__":
@@ -492,5 +565,20 @@ if __name__ == "__main__":
         action="store_true",
         help="Reuse successful records only when their config hash and artifact match.",
     )
+    parser.add_argument("--horizon", action="append", type=int, dest="horizons")
+    parser.add_argument("--model", action="append", dest="models")
+    parser.add_argument("--seed", action="append", type=int, dest="seeds")
+    parser.add_argument("--collect-only", action="store_true")
+    parser.add_argument("--defer-collection", action="store_true")
+    parser.add_argument("--device", default=None)
     args = parser.parse_args()
-    main(args.config, args.resume)
+    main(
+        args.config,
+        args.resume,
+        horizons=args.horizons,
+        models=args.models,
+        seeds=args.seeds,
+        collect_only=args.collect_only,
+        defer_collection=args.defer_collection,
+        device=args.device,
+    )

@@ -51,13 +51,13 @@ DATASETS = {
     "jena": DatasetSpec(
         key="jena",
         name="MPI-BGC Jena Beutenberg weather station",
-        temporal_resolution="high-frequency meteorological observations; raw archive provided in station downloads",
+        temporal_resolution="official 10-minute archives aggregated to hourly means",
         task_role="high-frequency multivariate weather forecasting under a different sampling regime",
         enabled=True,
         provenance="Max Planck Institute for Biogeochemistry weather data: https://weather.bgc-jena.mpg.de/weather_data.html",
         license="Creative Commons CC-BY-4.0",
         citation_hint="Acknowledge MPI for Biogeochemistry Jena Beutenberg weather station and record access date.",
-        notes="Station has operated since 2003; variables include temperature, humidity, pressure, wind, radiation and precipitation."
+        notes="Frozen v1 uses 2010--2020 hourly T, p, rh and wv. Observed completeness is recorded by the Jena audit, not invented here."
     ),
 }
 

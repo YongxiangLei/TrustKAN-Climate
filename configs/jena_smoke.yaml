@@ -1,0 +1,37 @@
+experiment:
+  name: jena_smoke
+
+dataset:
+  panel_config: configs/datasets/jena_frozen.yaml
+  prepared_dir: results/prepared/jena_frozen_v1
+  frequency: 1h
+  # Engineering-only tail subset; never use this configuration for paper results.
+  max_observations: 4000
+
+window:
+  history: 48
+  horizons: [1]
+
+split:
+  train: 0.60
+  validation: 0.15
+  calibration: 0.10
+  test: 0.15
+
+training:
+  seeds: [11]
+  batch_size: 64
+  epochs: 2
+  patience: 2
+  learning_rate: 0.001
+  optimizer: adamw
+  weight_decay: 0.01
+  deterministic_algorithms: true
+  deterministic_warn_only: false
+
+models: [persistence, svr, mlp, trustkan]
+
+model_search:
+  svr:
+    - {c: 1.0, epsilon: 0.1, gamma: scale}
+    - {c: 10.0, epsilon: 0.1, gamma: scale}

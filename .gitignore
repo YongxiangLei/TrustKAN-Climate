@@ -4,9 +4,11 @@ __pycache__/
 venv/
 .env
 .pytest_cache/
+tests/_scratch/
 .ipynb_checkpoints/
 data/raw/*.csv
 data/raw/ghcn/
+data/raw/jena/
 results/raw/*.npz
 results/aggregated/*.csv
 results/aggregated/*.json
@@ -20,6 +22,9 @@ results/dataset_audits/
 results/campaigns/
 results/prepared/
 results/reliability/
+results/extremes/
+results/robustness/
+results/splits/
 checkpoints/
 model/
 *.pth

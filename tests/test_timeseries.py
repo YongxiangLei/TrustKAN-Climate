@@ -19,6 +19,7 @@ def test_standardizer_uses_training_statistics_only():
     assert np.isclose(scaler.scaler.mean_[0], 1.0)
     transformed = scaler.transform(future)
     assert transformed.mean() > 50.0
+    assert np.allclose(scaler.inverse_column(scaler.transform(train)), train)
 
 
 def test_windows_and_origins_are_temporal():
