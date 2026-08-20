@@ -10,11 +10,11 @@
 | E06 | Does adaptive calibration help under temporal shift? | static vs adaptive conformal | rolling coverage plots |
 | E07 | Can the model identify distribution shift? | representation/residual/explanation scores | AUROC/AUPRC when labels are definable; temporal diagnostics otherwise |
 | E08 | Does abstention improve reliability? | confidence/reliability variants | risk–coverage and AURC |
-| E09 | Is performance robust to missing inputs? | all key models | error vs missing-rate |
-| E10 | Is performance robust to noise? | all key models | error vs noise level |
-| E11 | Are explanations stable? | KAN/Tem2-KAN/TrustKAN | lag/function stability statistics |
+| E09 | Is performance robust to missing inputs? | all key models | random and block-missing error curves from `configs/robustness.yaml` |
+| E10 | Is performance robust to noise? | all key models | standardized Gaussian-noise error curves |
+| E11 | Are explanations stable? | KAN/Tem2-KAN/TrustKAN | lag/function stability statistics from extracted RBF curves |
 | E12 | Does reliability correlate with actual error? | TrustKAN | reliability-error correlation/calibration |
-| E13 | What happens on extremes? | key baselines + TrustKAN | tail/extreme-event subset metrics |
+| E13 | What happens on extremes? | key baselines + TrustKAN | training-quantile first-lead tail metrics |
 | E14 | What is computational cost? | neural baselines | params, latency, training time, memory |
 | E15 | Are gains statistically credible? | main models | forecast-origin moving-block bootstrap, paired effect sizes, corrected sensitivity tests |
 

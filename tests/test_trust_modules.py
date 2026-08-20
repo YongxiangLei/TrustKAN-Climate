@@ -4,7 +4,9 @@ import torch
 from src.training.trust_engine import pinball_loss
 from src.drift.scores import mahalanobis_shift, percentile_to_reliability
 from src.reliability.fusion import fuse_reliability, choose_threshold_on_calibration
+from src.interpretability.kan_curves import extract_trustkan_curves
 from src.interpretability.stability import curve_correlation, normalized_curve_distance
+from src.models.trustkan import TrustKAN
 
 
 def test_pinball_loss_zero_for_exact_quantiles():
@@ -52,3 +54,19 @@ def test_curve_stability_identical_curves():
     a=np.array([[0.,1.,2.],[2.,1.,0.]])
     assert np.allclose(curve_correlation(a,a),1.0)
     assert np.allclose(normalized_curve_distance(a,a),0.0)
+
+
+def test_trustkan_curves_are_seed_stable_and_change_after_perturbation():
+    torch.manual_seed(0)
+    model_a = TrustKAN(n_features=1, horizon=1, hidden_dim=4, grid_size=3)
+    torch.manual_seed(0)
+    model_b = TrustKAN(n_features=1, horizon=1, hidden_dim=4, grid_size=3)
+    curves_a = extract_trustkan_curves(model_a)
+    curves_b = extract_trustkan_curves(model_b)
+    assert curves_a["curves"].shape[0] == 16
+    assert np.allclose(curves_a["curves"], curves_b["curves"])
+    with torch.no_grad():
+        model_b.encoder.kan.coeff.add_(0.5)
+    curves_c = extract_trustkan_curves(model_b)
+    distance = normalized_curve_distance(curves_a["curves"], curves_c["curves"])
+    assert float(distance.mean()) > 0.0
