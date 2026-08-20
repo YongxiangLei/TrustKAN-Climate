@@ -27,7 +27,7 @@ Persistence, SVR, Random Forest, XGBoost, MLP, LSTM, GRU, TCN, Transformer, opti
 
 - CET: long historical temperature continuity benchmark.
 - GHCN-Daily: independent station/network generalization.
-- Jena: high-frequency multivariate station weather.
+- Jena: frozen 2010--2020 hourly multivariate station weather.
 - ERA5: multivariate reanalysis / shift experiments.
 
 Dataset inclusion, provenance, licensing and anti-cherry-picking rules are defined in `docs/DATASET_PROTOCOL.md`.
@@ -62,15 +62,25 @@ hash, target timestamps, training history, per-sample inference latency and the
 path to its raw prediction artifact.
 
 Before producing paper tables, require at least five unique seeds for every
-stochastic model and validate every referenced raw artifact:
+stochastic model and validate every referenced raw artifact. The 188-run CET
+publication campaign can be planned and sharded without editing the frozen
+YAML files:
 
 ```bash
+python scripts/plan_cet_campaign.py \
+  --outdir results/campaigns/cet_publication
+python scripts/audit_cet_campaign.py \
+  --campaign results/campaigns/cet_publication/campaign.json \
+  --out results/campaigns/cet_publication/progress.json
 python scripts/run_cet_benchmark.py --config configs/cet.yaml --resume
+python scripts/run_cet_reliability.py --config configs/cet_reliability.yaml --resume
 python scripts/aggregate_results.py \
   --input results/aggregated/cet_full_runs.csv \
   --outdir results/tables/cet_full \
   --min-seeds 5
 ```
+
+See `docs/CET_CAMPAIGN.md` for CPU/GPU routing and the completion audit.
 
 Paired model comparisons follow the dependence-aware protocol in
 `docs/STATISTICAL_PROTOCOL.md`; overlapping forecast origins are evaluated with
@@ -161,6 +171,47 @@ python scripts/audit_ghcn_campaign.py \
 See `docs/GHCN_CAMPAIGN.md` for distributed execution, final collection, and
 the mandatory completion audit. See `docs/GPU_EXECUTION.md` for CUDA preflight,
 deterministic kernels, multi-GPU routing, and out-of-memory policy.
+
+The Jena hourly protocol is frozen independently of model performance. The
+complete paper matrix contains 141 atomic runs:
+
+```bash
+python scripts/audit_jena.py --manifest data/manifests/jena_sources.csv --require-eligible
+python scripts/prepare_jena.py --require-eligible
+python scripts/audit_jena_windows.py --config configs/jena.yaml
+python scripts/plan_jena_campaign.py \
+  --outdir results/campaigns/jena_publication
+python scripts/audit_jena_campaign.py \
+  --campaign results/campaigns/jena_publication/campaign.json \
+  --out results/campaigns/jena_publication/progress.json
+```
+
+See `docs/JENA_CAMPAIGN.md` for shard execution and the final collection gate.
+Smoke configurations require `--engineering` and remain prohibited from paper
+tables. Direct runner commands stay available for engineering:
+
+```bash
+python scripts/run_jena_benchmark.py --config configs/jena_smoke.yaml --resume
+python scripts/run_jena_reliability.py --config configs/jena_reliability_smoke.yaml --resume
+python scripts/run_jena_benchmark.py --config configs/jena.yaml --resume
+python scripts/aggregate_results.py \
+  --input results/aggregated/jena_full_runs.csv \
+  --outdir results/tables/jena_full \
+  --min-seeds 5
+```
+
+Robustness and extreme-event labels are also pre-registered in
+`configs/robustness.yaml` and `docs/ROBUSTNESS_PROTOCOL.md`. They may be scored
+only after raw prediction artifacts exist:
+
+```bash
+python scripts/evaluate_extremes.py \
+  --predictions path/to/raw_forecast.npz \
+  --train-target path/to/train_target.npz
+python scripts/evaluate_robustness.py \
+  --split-file path/to/splits.npz \
+  --frequency daily
+```
 
 For reliability experiments, prepare an `.npz` split containing `x_train`, `y_train`, `x_val`, `y_val`, `x_cal`, `y_cal`, `x_test`, and `y_test`, then run:
 

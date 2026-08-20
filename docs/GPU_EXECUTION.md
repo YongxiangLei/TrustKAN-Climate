@@ -47,6 +47,12 @@ Generate the formal campaign on the execution environment:
 python scripts/plan_ghcn_campaign.py \
   --outdir results/campaigns/ghcn_publication \
   --gpu-device cuda:0
+python scripts/plan_cet_campaign.py \
+  --outdir results/campaigns/cet_publication \
+  --gpu-device cuda:0
+python scripts/plan_jena_campaign.py \
+  --outdir results/campaigns/jena_publication \
+  --gpu-device cuda:0
 ```
 
 The output contains:

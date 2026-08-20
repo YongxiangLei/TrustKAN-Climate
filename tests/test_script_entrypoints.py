@@ -15,6 +15,8 @@ def test_cet_benchmark_file_entrypoint_can_import_project():
     assert result.returncode == 0, result.stderr
     assert "--config" in result.stdout
     assert "--resume" in result.stdout
+    assert "--horizon" in result.stdout
+    assert "--defer-collection" in result.stdout
 
 
 def test_ghcn_preparation_file_entrypoint_can_import_project():
@@ -70,6 +72,32 @@ def test_ghcn_campaign_planner_entrypoint_can_import_project():
         "plan_ghcn_campaign.py": "--benchmark-config",
         "audit_ghcn_campaign.py": "--campaign",
         "check_gpu_environment.py": "--device",
+    }
+    for script, option in expected.items():
+        result = subprocess.run(
+            [sys.executable, f"scripts/{script}", "--help"],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0, result.stderr
+        assert option in result.stdout
+
+
+def test_jena_and_robustness_entrypoints_can_import_project():
+    expected = {
+        "audit_jena.py": "--require-eligible",
+        "prepare_jena.py": "--manifest",
+        "audit_jena_windows.py": "--config",
+        "run_jena_benchmark.py": "--resume",
+        "run_jena_reliability.py": "--defer-collection",
+        "plan_jena_campaign.py": "--benchmark-config",
+        "audit_jena_campaign.py": "--campaign",
+        "run_cet_reliability.py": "--defer-collection",
+        "plan_cet_campaign.py": "--benchmark-config",
+        "audit_cet_campaign.py": "--campaign",
+        "evaluate_extremes.py": "--predictions",
+        "evaluate_robustness.py": "--split-file",
     }
     for script, option in expected.items():
         result = subprocess.run(

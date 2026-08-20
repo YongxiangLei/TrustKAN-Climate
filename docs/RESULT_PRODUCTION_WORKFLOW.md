@@ -13,7 +13,11 @@ Neural publication shards must additionally pass the CUDA environment gate in
 
 Full CET experiments write raw artifacts under `results/raw/cet_full/` and a
 run ledger to `results/aggregated/cet_full_runs.csv`. Smoke outputs are isolated
-under the `cet_smoke` namespace and are never publication candidates.
+under the `cet_smoke` namespace and are never publication candidates. The
+188-run CET publication campaign is planned by `scripts/plan_cet_campaign.py`
+as described in `docs/CET_CAMPAIGN.md`. The 141-run Jena publication campaign
+is planned by `scripts/plan_jena_campaign.py` as described in
+`docs/JENA_CAMPAIGN.md`.
 
 ```bash
 python scripts/run_cet_benchmark.py --config configs/cet.yaml --resume
@@ -89,7 +93,40 @@ Primary outcomes:
 
 A useful reliability score should normally have a negative reliability-error association, lower error in higher-reliability bins, and useful discrimination of large-error cases. These are empirical criteria, not assumptions.
 
-## 4. Generate paper artifacts
+## 4. Score pre-registered robustness and extremes
+
+Extreme labels and corruption levels come from `configs/robustness.yaml`.
+Training-quantile thresholds and test-history corruptions are never chosen from
+final rankings.
+
+```bash
+python scripts/evaluate_extremes.py \
+  --predictions results/raw/cet_full/cet_trustkan_h1_s11.npz \
+  --train-target results/splits/cet_train_target.npz \
+  --out results/extremes/cet_trustkan_h1.json
+
+python scripts/evaluate_robustness.py \
+  --split-file results/splits/cet_h1.npz \
+  --frequency daily \
+  --out results/robustness/cet_persistence.csv
+```
+
+Jena preparation is independent of model performance. After the official
+archives pass eligibility, plan the 141-run shard campaign rather than
+editing the frozen configs:
+
+```bash
+python scripts/audit_jena.py --manifest data/manifests/jena_sources.csv --require-eligible
+python scripts/prepare_jena.py --require-eligible
+python scripts/audit_jena_windows.py --config configs/jena.yaml
+python scripts/plan_jena_campaign.py \
+  --outdir results/campaigns/jena_publication
+python scripts/audit_jena_campaign.py \
+  --campaign results/campaigns/jena_publication/campaign.json \
+  --out results/campaigns/jena_publication/progress.json
+```
+
+## 5. Generate paper artifacts
 
 ```bash
 python scripts/generate_paper_artifacts.py \
