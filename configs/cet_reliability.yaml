@@ -1,0 +1,47 @@
+experiment:
+  name: cet_reliability_full
+
+dataset:
+  name: CET_Pershore_College
+  source: https://raw.githubusercontent.com/YongxiangLei/kan_proj/d4458e8fb11883b2eec0994aaaa6b7914e7f9e60/cet_mean_station_series.csv
+  date_column: date
+  target_column: Pershore_College
+  frequency: 1D
+  min_valid_temperature: -20.0
+  sha256: c54a9da8a66e71368ebf1dde70d8f6d8110d63bb15d39969e34568f5089048f7
+
+window:
+  history: 365
+  horizons: [1, 7, 30, 90]
+
+split:
+  train: 0.60
+  validation: 0.15
+  calibration: 0.10
+  test: 0.15
+
+training:
+  seeds: [11, 22, 33, 44, 55]
+  batch_size: 64
+  epochs: 100
+  patience: 10
+  learning_rate: 0.001
+  weight_decay: 0.01
+  deterministic_algorithms: true
+  deterministic_warn_only: false
+  point_weight: 1.0
+  quantile_weight: 1.0
+
+model:
+  hidden_dim: 64
+  grid_size: 8
+  quantiles: [0.05, 0.5, 0.95]
+
+conformal:
+  alpha: 0.10
+
+reliability:
+  fusion_weights: [0.5, 0.5]
+  min_calibration_coverage: 0.50
+  embedding_reference_max: 4096
+  error_quantile: 0.90
