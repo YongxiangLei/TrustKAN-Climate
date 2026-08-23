@@ -22,11 +22,22 @@ results/dataset_audits/
 results/campaigns/
 results/prepared/
 results/reliability/
+results/ablations/
 results/extremes/
 results/robustness/
 results/splits/
 checkpoints/
 model/
+
+# LaTeX build products; the manuscript sources and generated tables are tracked.
+paper/*.aux
+paper/*.bbl
+paper/*.blg
+paper/*.log
+paper/*.out
+paper/*.pdf
+paper/compile.log
+paper/bib.log
 *.pth
 *.pt
 .DS_Store

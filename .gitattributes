@@ -1,0 +1,13 @@
+# Experiment provenance hashes read source bytes directly, so a checkout that
+# rewrites line endings would change code_sha256 and invalidate every resumable
+# run record. Normalize to LF everywhere.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.pdf binary
+*.gz binary
+*.zip binary
+*.npz binary
+*.pt binary
+*.pth binary
