@@ -25,7 +25,10 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-import _bootstrap  # noqa: F401  # repository-root import setup
+try:
+    import _bootstrap  # noqa: F401  # file-path execution
+except ModuleNotFoundError:
+    from scripts import _bootstrap  # noqa: F401  # module execution
 
 ROOT = Path(__file__).resolve().parents[1]
 RAW = ROOT / "results" / "interpretability" / "raw" / "cet_kan_curves"

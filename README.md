@@ -237,6 +237,20 @@ python scripts/evaluate_robustness.py \
   --frequency daily
 ```
 
+The CET corruption sweep has its own runner, because corruptions apply to test
+histories and the benchmark stored no weights. Its grid begins with the clean
+history, so each run validates itself: a run whose clean RMSE does not equal the
+benchmark ledger value is refused rather than reported.
+
+```bash
+python scripts/run_robustness_campaign.py --device cuda:0 --resume
+python scripts/analyze_robustness.py
+```
+
+The analysis also measures how many trailing timesteps each architecture's
+readout can actually see, which is what explains the shape of the block-missing
+column.
+
 For reliability experiments, prepare an `.npz` split containing `x_train`, `y_train`, `x_val`, `y_val`, `x_cal`, `y_cal`, `x_test`, and `y_test`, then run:
 
 ```bash
