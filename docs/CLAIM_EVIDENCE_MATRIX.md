@@ -33,12 +33,15 @@ five seeds, current code fingerprint `6426a567`:
 | kan (plain) | 2.075 | 2.822 | 3.000 | 3.026 |
 | mlp | 2.121 | 2.827 | 2.967 | 3.019 |
 | trustkan | 2.057 | 2.969 | 3.524 | 4.429 |
-| persistence | 2.144 | 3.316 | 4.037 | - |
+| persistence | 2.144 | 3.316 | 4.037 | 5.458 |
 
-TrustKAN is mid-pack at one day and degrades faster than every baseline as the
-lead time grows, ending worst of all models at 90 days. These numbers already
-reflect the corrected last-state readout; the earlier mean-pooled readout was
-worse still and lost to persistence everywhere.
+TrustKAN is mid-pack at one day and degrades faster than every learned baseline
+as the lead time grows, ending worst of them at 90 days. Its 90-day error
+(4.429) exceeds what persistence achieves at 30 days (4.037), though it stays
+ahead of persistence at a matched horizon. These numbers already reflect the
+corrected last-state readout; the A9 reproduction of the mean-pooled readout
+falls behind persistence at 3 of the 4 horizons, by up to 1.80 degC, and edges
+ahead only at h90 where persistence itself collapses.
 
 The architecture therefore cannot be presented as an accuracy contribution on
 this dataset. Any surviving accuracy statement must be scoped to one-day
