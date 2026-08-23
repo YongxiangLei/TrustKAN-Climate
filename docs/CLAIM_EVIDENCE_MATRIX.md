@@ -143,6 +143,45 @@ of a convolutional stem, so its inputs are latent channels rather than observed
 variables; even a stable curve would describe a coordinate of the model's own
 making. No physical reading is drawn from these curves.
 
+## Provenance of the retrained sweeps, audited 2026-08
+
+The benchmark kept predictions, not weights, so three analyses retrain: the
+corruption sweep, the KAN curve extraction, and the receptive-field measurement.
+Retraining raises a fair objection — that these might be different models sharing
+a protocol — so the binding was audited rather than assumed.
+
+| check | benchmark | robustness | KAN curves | receptive field |
+|---|---|---|---|---|
+| records | 162 ok | 60 ok | 20 ok | 12 ok |
+| `config_sha256` | `ebd6ad64e219` | same | same | same |
+| `dataset_sha256` | `c54a9da8a66e` | same | same | same |
+| device / torch | `cuda:0`, `2.13.0+cu126` | same | same | same |
+| RMSE vs ledger | — | max gap 3.3e-07 | max gap 4.4e-16 | exact, gated |
+| clean predictions vs ledger artifact | — | **bit-identical, all 60** | — | — |
+
+The decisive line is the last. An RMSE match is a scalar agreement that two
+similar models could produce by luck; an elementwise match of the whole test
+prediction vector, in all 60 runs, cannot be produced by different weights. The
+3.3e-07 RMSE gap is not a weight difference but a summation-order difference: the
+sweep recomputes RMSE through the corruption-grid path while the ledger value
+came from the benchmark path, and the underlying predictions are identical.
+
+`code_sha256` differs across these campaigns by construction and is not
+comparable: each runner hashes its own file list, so the robustness runner's
+`b7702556671f` covers `run_robustness_campaign.py` and the benchmark's
+`6426a567bf54` does not. The curve and receptive-field runners additionally store
+`benchmark_code_sha256`, which does match the ledger's `6426a567bf54`.
+
+**Environment.** All published runs come from one interpreter, `.venvs/trustkan`
+(Python 3.12.13, torch 2.13.0+cu126, RTX 2060). A second environment exists at
+`.venv` inside the repository with CPU-only torch and missing dependencies; it
+has produced nothing and cannot, because the RMSE gate fails across torch builds
+and device classes. `docs/RESULT_PRODUCTION_WORKFLOW.md` section 0 records this.
+The hazard is real and worth keeping documented: bare `python` on `PATH`
+resolves to a third installation with no torch at all.
+
+The audit is encoded in `tests/test_robustness_provenance.py` so it cannot drift.
+
 ## CET robustness outcome, 2026-08
 
 Sixty runs (3 models x 4 horizons x 5 seeds) retrained under the frozen protocol.
@@ -169,7 +208,17 @@ Identical errors mean the extra masked days were never read. Perturbing one
 timestep at a time and checking which perturbations move the forecast gives the
 effective receptive field directly: 3 timesteps for TrustKAN against the full 365
 for the plain KAN and the transformer. The configured history is a year and the
-model sees three days of it. This is an architectural property of the dilated
+model sees three days of it.
+
+That measurement is made on trained weights, not on the architecture in the
+abstract. `scripts/run_receptive_field.py` retrains each model under the frozen
+protocol, admits it only after its test RMSE reproduces the ledger, and repeats
+this at all four horizons; the reach does not vary with horizon, and a randomly
+initialized control of the same architecture returns the same number. Agreement
+between the trained measurement and the control is what makes this a structural
+property of the design rather than an artifact of one optimization run — and the
+control is also why the earlier, untrained-only version of this measurement
+happened to give the right answer. This is an architectural property of the dilated
 convolutional stem, independent of the readout defect corrected earlier, and it
 explains both the 90-day accuracy collapse and the block fragility. It also
 qualifies the A1 and plain-KAN comparisons: they are sound as paired tests but do

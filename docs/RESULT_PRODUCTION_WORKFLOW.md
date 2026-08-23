@@ -2,7 +2,47 @@
 
 This project treats manuscript tables and figures as deterministic products of saved experiment outputs.
 
-## 0. Produce and validate deterministic benchmark runs
+## 0. Use the authoritative environment
+
+Every published run was produced by one interpreter, and it is the only one that
+can reproduce them:
+
+```
+C:\Users\79441\Documents\Codex\.venvs\trustkan\Scripts\python.exe
+Python 3.12.13, torch 2.13.0+cu126, CUDA available, NVIDIA GeForce RTX 2060
+```
+
+This is not a preference. Runners that retrain a reported model
+(`run_robustness_campaign.py`, `run_kan_curves.py`, `run_receptive_field.py`)
+refuse their results unless the retrained test RMSE reproduces the benchmark
+ledger to within `1e-6`. Deterministic training reproduces bit-exactly on the
+same torch build and device class and does not reproduce across a different one,
+so running these under any other interpreter does not produce a wrong number: it
+produces a hard failure. That is the intended behaviour, and it is why the gate
+exists.
+
+**Known hazard.** A second virtual environment exists inside the repository at
+`.venv`. It carries a CPU-only torch build (`2.13.0+cpu`) and, as of 2026-08, was
+missing `pandas`, `scikit-learn`, `matplotlib`, `tqdm` and `statsmodels`
+entirely. It has never produced a published run. Two environments in one project
+is a reproducibility hazard: `python` on `PATH` resolves to neither of them but
+to an unrelated Anaconda installation that has no torch at all. Always invoke the
+authoritative interpreter by absolute path, and never by a bare `python`.
+
+Analysis-only scripts that read artifacts (`analyze_robustness.py`,
+`make_paper_tables.py`, `make_paper_figures.py`, `make_paper_bundle.py`) do not
+retrain and so are not gated, but they should still be run under the
+authoritative interpreter so that a single environment accounts for everything
+in `paper/`.
+
+To check what produced any existing result, read its run record: every record
+under `results/**/runs/` stores `python`, `torch`, `torch_cuda`, `device` and
+`cuda_device_name` alongside the `code_sha256`, `config_sha256` and
+`dataset_sha256` fingerprints. `results/runs/cet_full/` shows `cuda:0` with
+`2.13.0+cu126` for all neural runs; classical baselines record `cpu`, which is
+expected because they never touch the GPU.
+
+## 0b. Produce and validate deterministic benchmark runs
 
 For the 1,410-run GHCN publication campaign, first generate the immutable shard
 manifest described in `docs/GHCN_CAMPAIGN.md`. Final collection must pass both
@@ -110,6 +150,22 @@ python scripts/evaluate_robustness.py \
   --frequency daily \
   --out results/robustness/cet_persistence.csv
 ```
+
+The CET corruption sweep and the receptive-field measurement both need weights,
+which the benchmark did not retain, so both retrain under the frozen protocol and
+accept a run only when its test RMSE reproduces the ledger. Run them under the
+authoritative interpreter of section 0; under any other they fail the gate by
+design.
+
+```bash
+python scripts/run_robustness_campaign.py --resume
+python scripts/run_receptive_field.py
+python scripts/analyze_robustness.py --outdir paper/tables
+```
+
+`analyze_robustness.py` reads both artifacts and refuses to report a receptive
+field that varies with horizon, since a number that did would describe a trained
+instance rather than the architecture.
 
 Jena preparation is independent of model performance. After the official
 archives pass eligibility, plan the 141-run shard campaign rather than
