@@ -210,6 +210,20 @@ python scripts/run_ablations.py --config configs/ablations.yaml --resume --devic
 See `docs/TRUSTKAN_ABLATIONS.md` for the hypothesis and failure criterion
 attached to each variant.
 
+The interpretability analysis needs weights, which the benchmark runner does not
+store, so it retrains each reported TrustKAN run and accepts it only when the
+retrained model reproduces its ledger RMSE. Extraction and analysis are split so
+that the derived measurements can be revised without retraining:
+
+```bash
+python scripts/run_kan_curves.py --device cuda:0 --resume
+python scripts/analyze_kan_curves.py
+```
+
+Read the cross-seed numbers together with the controls the analysis prints
+beside them. A best-match correlation near one means little on its own, because
+the same statistic computed inside a single run scores just as high.
+
 Robustness and extreme-event labels are also pre-registered in
 `configs/robustness.yaml` and `docs/ROBUSTNESS_PROTOCOL.md`. They may be scored
 only after raw prediction artifacts exist:
@@ -230,6 +244,22 @@ python scripts/run_trustkan_reliability.py \
   --split-file path/to/splits.npz \
   --out results/reliability/trustkan.json
 ```
+
+## Building the manuscript
+
+No number is typed into the manuscript by hand. Every table, figure, and value
+quoted in prose is emitted from the frozen ledgers, and the table generator
+refuses to build from a ledger holding no run that matches the current code
+fingerprint, so a stale aggregation cannot reach the paper:
+
+```bash
+python scripts/make_paper_tables.py
+python scripts/make_paper_figures.py
+cd paper && pdflatex main && bibtex main && pdflatex main && pdflatex main
+```
+
+Both generators live outside the runners' `code_sha256` set, so regenerating
+output never invalidates a completed run.
 
 ## Reproducibility principles
 

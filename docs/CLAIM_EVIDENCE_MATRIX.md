@@ -9,12 +9,12 @@ This file prevents manuscript claims from outrunning experimental evidence.
 | TrustKAN provides calibrated uncertainty | Calibration/test separation; marginal and simultaneous coverage, width and interval score vs UQ baselines | **Partially supported, but not a contribution.** Marginal coverage lands on nominal (0.894/0.889/0.901/0.904) — this is the split-conformal guarantee and holds for any backbone. Simultaneous bands under-cover (0.870/0.850/0.862 at h7/h30/h90) and per-origin joint coverage collapses (0.609/0.256/0.103) |
 | Adaptive calibration is robust to temporal shift | Rolling coverage and shift experiments vs static conformal | **Supported on CET.** A8 cuts rolling coverage deviation against static split conformal by 13.7%, 14.9%, 21.1% and 32.9% at h1/h7/h30/h90 for a width cost of only 2.5-4.6%, and the gain grows with lead time |
 | KAN component is necessary at all | Budget-matched replacement of the KAN mapping by an MLP (A1) | **Refuted on CET.** A1 differs from the full model by at most 0.008 degC, inside the across-seed spread, at every horizon |
-| KAN explanations are stable | Across-seed and perturbation stability metrics, not only visual examples | Planned. Note any such analysis now describes a mapping that A1 shows is functionally interchangeable with an MLP |
+| KAN explanations are stable | Across-seed and perturbation stability metrics, not only visual examples | **Refuted on CET.** Index-matched curve correlation is +0.001/+0.001/+0.001/+0.000 at h1/h7/h30/h90, i.e. chance. Both charitable readings fail their controls: matched \|r\| is 0.780 against a shuffled-pair control of 0.780, and best-match 0.996 against a within-seed control of 0.996 |
 | Representation changes help reveal climate shift | Quantitative drift protocol or carefully defined temporal diagnostics | Planned |
 | Reliability score predicts forecast failure | Error-vs-reliability association and top-error AUROC/AUPRC against width-only and shift-only components | **Refuted on CET.** Top-error AUROC is 0.516/0.492/0.503/0.540 across h1/h7/h30/h90, i.e. chance. AUPRC matches the base rate and the error-reliability Spearman correlation is |rho| <= 0.12 |
 | Selective forecasting reduces risk | Origin-wise risk–coverage curves, AURC, retained-set error and width-only/shift-only ablations | **Refuted on CET.** The fused score loses to its own width-only component at every horizon, and discarding half the origins cuts RMSE by only 1-3% |
 | Method is robust to corrupted inputs | Noise, random missingness and block missingness experiments | Protocol frozen; full evidence pending |
-| Method is computationally practical | Parameter count, memory, training time and CPU/GPU inference latency | Timing pipeline validated; full evidence pending |
+| Method is computationally practical | Parameter count, memory, training time and CPU/GPU inference latency | **Supported, but it explains nothing.** On one RTX 2060 TrustKAN uses 58,496 parameters, 58.4 s to train and 0.097 ms per origin, mid-pack on all three; the transformer that beats it at every horizon is the largest and slowest. Cost does not account for the accuracy ordering |
 | Method is useful on climate extremes | Pre-defined extreme subsets and event-tail metrics with uncertainty coverage | **Refuted on CET.** On the frozen 5th/95th-percentile subsets TrustKAN is best at no horizon, trailing the transformer by 0.10, 0.19, 0.28 and 0.75 degC at h1/h7/h30/h90 |
 
 ## Rule
@@ -112,6 +112,33 @@ the between-model comparison on a fixed subset is meaningful.
 Notably, TrustKAN's h90 extreme-subset error (3.587) is well below its
 complement error (4.512), so its degradation is concentrated on ordinary days
 rather than on the rare events the framework targeted.
+
+## CET interpretability outcome, 2026-08
+
+The benchmark runner kept predictions, not weights, so all 20 TrustKAN runs were
+retrained under the frozen protocol and accepted only when their test RMSE
+equalled the ledger value. All 20 reproduced exactly, which is what licenses
+reading these curves as the reported models' curves.
+
+Each run exposes 4,096 univariate curves. Cross-seed agreement, averaged over the
+10 seed pairs per horizon:
+
+| statistic | h1 | h7 | h30 | h90 | control |
+|---|---|---|---|---|---|
+| index-matched r | +0.001 | +0.001 | +0.001 | +0.000 | 0 by construction |
+| matched \|r\| | 0.778 | 0.775 | 0.780 | 0.789 | shuffled pairs: 0.780 |
+| best-match r | 0.9965 | 0.9964 | 0.9965 | 0.9964 | within-seed: 0.9963 |
+
+Both charitable readings die against their controls. Matched curves correlate in
+magnitude no better than curves paired at random, and a near-perfect best match
+is equally available inside a single run, because 3 principal components span 95%
+of the shape variance across all 4,096 curves. The curves are also barely curved:
+median linear R^2 is 0.94 and 60% of curves exceed 0.9.
+
+One limitation is structural, not statistical. The KAN layer consumes the output
+of a convolutional stem, so its inputs are latent channels rather than observed
+variables; even a stable curve would describe a coordinate of the model's own
+making. No physical reading is drawn from these curves.
 
 ## Summary
 
