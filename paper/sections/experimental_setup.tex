@@ -2,20 +2,24 @@
 \label{sec:experiments}
 
 \subsection{Datasets}
-The study is designed around four complementary climate/weather sources: Central England Temperature (CET), NOAA/NCEI GHCN-Daily station observations, Jena weather-station measurements, and ERA5 reanalysis. CET provides continuity with prior climate KAN work; GHCN-Daily evaluates station-level geographic generalization; Jena provides high-frequency multivariate observations; and ERA5 supports reanalysis-based multivariate and distribution-shift experiments. The GHCN panel is frozen before model comparison and contains one objectively selected station from each of five geographic strata. Its target is daily midrange temperature derived from quality-controlled TMAX and TMIN over 1950--2024. The Jena protocol is now frozen: official 10-minute Beutenberg archives are quality-controlled and aggregated to hourly means of air temperature, pressure, relative humidity and wind speed over 2010--2020. Derived thermodynamic variables are excluded. Observed Jena sample counts remain blank until the eligibility audit of the official archives exists. ERA5 region, variables and years remain to be frozen before its headline experiments. \todo{Complete the CET and ERA5 rows, and the Jena sample count, only after those metadata or audits are finalized.}
+The results reported in this paper come from one observational source: a daily Central England Temperature (CET) station series, which provides continuity with prior climate KAN work and a long, clean, gap-free univariate history. The frozen panel spans \cetFirstYear{}--\cetLastYear{}, giving \cetSamples{} daily forecast origins after windowing, of which \cetTestSamples{} form the held-out test region covering \cetTestStart{} to \cetTestEnd{}.
+
+Three further protocols were frozen in advance and are not reported, and we state the reason for each rather than presenting a four-dataset design the evidence does not support. The GHCN-Daily protocol is fully specified and its panel is prepared: one objectively selected station from each of five geographic strata, targeting daily midrange temperature from quality-controlled TMAX and TMIN over 1950--2024, with the panel fixed before any model comparison. Its campaign was planned but not executed within the compute budget available for this study, so no station-generalization result is claimed. The Jena protocol is likewise frozen in full, aggregating official 10-minute Beutenberg archives to hourly means of air temperature, pressure, relative humidity and wind speed over 2010--2020 and excluding derived thermodynamic variables; its runners, planner and audit are implemented, but the official archives were not retrieved. ERA5 region, variables and years remain to be frozen. Because each protocol was fixed independently of any observed model ranking, adding results later cannot constitute a post-hoc selection, and the conclusions here are correspondingly scoped to a single station.
 
 \begin{table}[t]
 \centering
-\caption{Dataset characteristics. All entries must be generated from finalized dataset metadata.}
+\caption{Dataset characteristics. Only CET is reported here; the remaining protocols are frozen and unexecuted for the reasons given in the text.}
 \label{tab:datasets}
 \begin{tabular}{lcccc}
 \toprule
-Dataset & Resolution & Variables & Period & Samples \\
+Dataset & Resolution & Variables & Period & Origins \\
 \midrule
-CET & \todo{daily} & \todo{} & \todo{} & \todo{} \\
+CET & daily & T & \cetFirstYear--\cetLastYear & \cetSamples \\
+\midrule
+\multicolumn{5}{l}{\emph{Frozen but not reported in this paper}} \\
 GHCN-Daily & daily & TMAX, TMIN & 1950--2024 & 135,738 \\
-Jena & hourly & T, p, rh, wv & 2010--2020 & \todo{eligibility audit} \\
-ERA5 & \todo{} & \todo{} & \todo{} & \todo{} \\
+Jena & hourly & T, p, rh, wv & 2010--2020 & pending audit \\
+ERA5 & pending & pending & pending & pending \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -24,7 +28,7 @@ ERA5 & \todo{} & \todo{} & \todo{} & \todo{} \\
 All time series are split chronologically into training, validation, calibration, and final test regions. The GHCN fractions are 60\%, 15\%, 10\%, and 15\%, respectively. Normalization parameters are estimated from training observations only. Windowed samples are assigned according to forecast-target origin, and windows whose forecast target crosses a split boundary are excluded. GHCN windows must also be strictly daily-contiguous; missing days are not interpolated. Jena windows must be strictly hourly-contiguous after the frozen 10-minute quality-control and aggregation step. Hyperparameter selection uses training and validation data; conformal correction and reliability thresholds use calibration data; the final test set is reserved exclusively for evaluation.
 
 \subsection{Forecasting Tasks}
-Experiments include multiple forecast horizons selected according to each dataset's temporal resolution. The CET development benchmark considers 1-, 7-, 30-, and 90-step horizons. The frozen GHCN protocol uses 30 daily history steps and 1-, 7-, and 30-day horizons. The frozen Jena protocol uses 168 hourly history steps and 1-, 6-, and 24-hour horizons. Equivalent horizon sets for ERA5 will be specified before its final experiments.
+Experiments include multiple forecast horizons selected according to each dataset's temporal resolution. The CET benchmark uses 365 daily history steps and 1-, 7-, 30-, and 90-day horizons. The frozen GHCN protocol uses 30 daily history steps and 1-, 7-, and 30-day horizons. The frozen but unreported Jena protocol uses 168 hourly history steps and 1-, 6-, and 24-hour horizons; equivalent horizon sets for ERA5 will be specified before its experiments.
 
 \subsection{GHCN Geographic Generalization}
 GHCN evaluation separates within-station temporal generalization from leave-one-region-out parameter transfer. In the transfer task, training and validation windows are pooled from four source regions and the fifth station is held out from model fitting and early stopping. Source regions are balanced by deterministic, chronologically uniform subsampling to the smallest source-window count in each split. Each station is standardized using only its own historical training period, so the transfer task permits target-history normalization but never target validation or test fitting. Immediately preceding target-station observations may form forecast inputs because they are available at prediction time. Results are reported per region and as equal-region macro averages; forecast origins are not pooled across stations as independent replicates.
@@ -43,6 +47,15 @@ Neural GHCN publication runs use an explicitly recorded CUDA device with determi
 
 \subsection{Statistical Analysis}
 Headline neural comparisons use at least five independent random seeds. Paired comparisons are computed from predictions at identical forecast origins and timestamps. Because adjacent and multi-horizon windows overlap, primary confidence intervals for MAE and RMSE differences use a circular moving-block bootstrap over forecast origins, keeping all horizon elements from each origin together. Block length is fixed before final comparison and is at least the forecast-horizon width. Origin-level Wilcoxon tests and paired standardized mean differences are reported only as sensitivity analyses because they do not model serial dependence. Holm correction is applied to each pre-specified primary comparison family; exploratory families may additionally report Benjamini--Hochberg correction. Statistical evidence is interpreted together with effect magnitude and practical relevance rather than as a binary criterion.
+
+\subsection{Ablation Design}
+Each claimed component is tied to a removable module and a predefined failure criterion, listed as A0--A9. A0 is the full model. A1 replaces the KAN mapping with a two-layer MLP whose width is chosen so that the parameter budget matches the KAN layer to within one percent, so the comparison isolates the mapping rather than capacity. A2 removes the quantile head; its degenerate quantiles reduce split conformal exactly to symmetric absolute-residual intervals, and its pinball weight is zero so no quantile gradient reaches the point head. A3--A7 are evaluation-side removals recomputed from the A0 artifact: conformal correction, the representation-shift score, the interval-width score, their fusion, and abstention. A8 replays the A0 predictions through sequential adaptive conformal and compares rolling-coverage deviation against the static construction. A9 restores the mean-pooled readout discussed in Section~\ref{sec:correction}. Ablations share the CET protocol, seeds and forecast origins with the headline runs.
+
+\subsection{A Corrected Temporal Readout}
+\label{sec:correction}
+Our first complete CET campaign showed the proposed model losing to a persistence baseline at every horizon, and we report the cause because it affects how the final numbers should be read. The original implementation aggregated encoder states with a global average over the entire history window. With a 365-step daily history, that average is close to the local climatological mean and therefore discards the recency information that dominates short-horizon temperature forecasting; a persistence rule using only the last observation was more accurate. All recurrent and attention baselines in this study read the final encoder state instead.
+
+We changed the readout to the final state, matching the convention already used by every baseline. The choice was made for consistency with the baselines rather than by comparing candidate readouts on test performance, and the evaluation protocol---splits, seeds, horizons, metrics, calibration policy and statistical procedure---was not altered. Because the provenance hash covers the whole source tree, the correction invalidated every existing run record and the complete campaign was re-executed. Baseline results reproduced bit-identically across the two campaigns, which confirms the change is isolated to the proposed model and that training remained deterministic. The superseded behaviour is retained as ablation A9 so the defect stays measurable rather than merely described.
 
 \subsection{Robustness and Shift Protocols}
 Robustness experiments use a pre-registered grid of standardized Gaussian noise, random history dropout, and recent-block dropout. Extreme-event subsets are labelled from training-period 5\%/95\% target quantiles on the first forecast lead; subsets with fewer than 30 origins are reported as underpowered. Adaptive/rolling conformal experiments evaluate coverage through time rather than only as an aggregate. Corruption levels and extreme definitions are not revised after examining final model rankings.

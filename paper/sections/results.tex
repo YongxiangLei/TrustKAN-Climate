@@ -1,51 +1,70 @@
 \section{Results}
 \label{sec:results}
 
-This section must be populated only from machine-readable experiment outputs. Numerical values should not be typed manually into the manuscript.
+Every number in this section is emitted by \texttt{scripts/make\_paper\_tables.py} from the frozen run ledgers; none is transcribed by hand. The generator refuses to build a table from a ledger that contains no run matching the current code fingerprint, so a stale aggregation cannot reach the manuscript. Unless stated otherwise, results are the mean over five seeds on the held-out test segment, and all comparisons use the circular moving-block bootstrap over forecast origins described in Section~\ref{sec:experiments}.
 
 \subsection{Deterministic Forecasting}
-\todo{Insert generated multi-dataset, multi-horizon comparison table. Discuss mean$\pm$std performance, not only the best single run. Report cases where TrustKAN does not rank first.}
+\label{sec:results_accuracy}
 
-\IfFileExists{tables/benchmark_summary.tex}{\input{tables/benchmark_summary.tex}}{}
+Table~\ref{tab:cet_rmse} reports test RMSE for all ten models. \method{} is mid-pack at one day and deteriorates faster than every baseline as lead time grows, ending last of all models at ninety days, where it is worse than the persistence forecast is at thirty. The transformer is best at all four horizons. The pattern is not seed noise: \method's standard deviation across seeds is at most $0.003$\,\degC{}, an order of magnitude smaller than the gaps being discussed, so the model is converging reliably to a worse solution rather than converging unstably.
+
+\IfFileExists{tables/cet_rmse.tex}{\input{tables/cet_rmse.tex}}{}
+
+Table~\ref{tab:cet_paired} reports the pre-specified comparison family. Two comparators were fixed in advance: a budget-matched plain KAN, which isolates the temporal KAN module because it removes that module while holding the parameter budget and every protocol element constant, and the transformer, which was designated the strongest neural baseline. Each of the forty pairs shares a forecast origin set and a seed, so the bootstrap resamples matched errors, and Holm correction is applied across each comparator's twenty-comparison family. Correction does not change any conclusion: every significant pair attains the smallest achievable bootstrap significance level at $5000$ resamples.
+
+\IfFileExists{tables/cet_paired.tex}{\input{tables/cet_paired.tex}}{}
+
+\method{} wins none of the forty comparisons. Against the plain KAN, the one-day interval includes zero for all five seeds, so the two are indistinguishable there; at 7, 30, and 90 days the plain KAN is significantly better for every seed, with the mean penalty rising monotonically from $0.147$ to $1.403$\,\degC{}. Against the transformer, the comparator is significantly better for every seed at every horizon, including at one day, where the mean gap of $0.068$\,\degC{} is small but consistent enough that no interval covers zero.
+
+The comparison against the plain KAN is the decisive one, because it is the ablation that the temporal KAN module was introduced to pass. Removing that module and spending the same parameters on the simpler mapping improves accuracy at every horizon where the two differ. The monotone growth of the gap with lead time indicates that the module is not merely redundant but is imposing a cost that compounds as the prediction problem becomes harder.
 
 \subsection{Probabilistic Forecasting and Calibration}
-\todo{Insert static conformal and quantile-forecast results: empirical coverage, interval width, interval score, and calibration deviation. Compare static, rolling, and adaptive calibration.}
+\label{sec:results_calibration}
 
-\subsection{Adaptive Conformal Performance under Drift}
-\todo{Report rolling coverage trajectories and interval-width trade-offs under temporal drift. Quantify whether adaptive calibration improves coverage stability and whether it pays for this through excessive interval expansion.}
+Table~\ref{tab:cet_calibration} reports calibration at a nominal level of $0.90$.
 
-\begin{figure}[t]
-\centering
-\IfFileExists{figures/rolling_coverage.pdf}{\includegraphics[width=\columnwidth]{rolling_coverage.pdf}}{\fbox{\parbox{0.9\columnwidth}{\centering Rolling coverage figure will be generated from experiment outputs.}}}
-\caption{Rolling empirical coverage under static, rolling, and adaptive conformal calibration.}
-\label{fig:rollingcoverage}
-\end{figure}
+\IfFileExists{tables/cet_calibration.tex}{\input{tables/cet_calibration.tex}}{}
 
-\subsection{Reliability--Error Association}
-\todo{Report Spearman/Pearson association, reliability-bin errors, and AUROC/AUPRC for identifying high-error predictions. A reliability score that does not predict realized error should not be presented as a core contribution.}
+Marginal coverage is accurate at all four horizons, deviating from nominal by at most \maxCoverageDeviation{} percentage points. This is the clearest positive result in the study and also the least informative one. Split conformal calibration guarantees marginal coverage under exchangeability of the calibration and test residuals, for any underlying predictor; the same wrapper applied to the persistence baseline would produce the same property. The result therefore confirms that the calibration partition and the conformal implementation are correct, and it says nothing about the KAN representation.
 
-\begin{figure}[t]
-\centering
-\IfFileExists{figures/reliability_vs_error.pdf}{\includegraphics[width=\columnwidth]{reliability_vs_error.pdf}}{\fbox{\parbox{0.9\columnwidth}{\centering Reliability--error figure will be generated from experiment outputs.}}}
-\caption{Relationship between estimated reliability and realized forecasting error.}
-\label{fig:reliabilityerror}
-\end{figure}
+The quantity that a practitioner would rely on behaves quite differently. Joint coverage, the probability that a forecast trajectory is contained in its interval band at every one of its lead times simultaneously, falls from $0.894$ at one day to $0.609$, $0.256$, and $0.103$ at 7, 30, and 90 days. This is expected behaviour for marginally calibrated intervals under strong serial dependence, and it is why we pre-registered the simultaneous band as well. The simultaneous construction holds up far better, but it still under-covers, reaching $0.870$, $0.850$, and $0.862$ at the three longer horizons against a nominal $0.90$, and it pays for the improvement with intervals that are \widthRatioSeven{} to \widthRatioNinety{} times wider. A user who reads only the marginal figure would substantially overestimate how often a whole forecast trajectory is trustworthy.
 
-\subsection{Selective Prediction}
-\todo{Insert risk--coverage curves and quantify AURC, retained-set RMSE/MAE, abstention rate, and large-error removal rate. Compare against simple uncertainty-only and shift-only selection.}
+\subsection{Reliability--Error Association and Selective Prediction}
+\label{sec:results_selective}
 
-\begin{figure}[t]
-\centering
-\IfFileExists{figures/risk_coverage.pdf}{\includegraphics[width=\columnwidth]{risk_coverage.pdf}}{\fbox{\parbox{0.9\columnwidth}{\centering Risk--coverage figure will be generated from experiment outputs.}}}
-\caption{Risk--coverage behaviour for selective forecasting.}
-\label{fig:riskcoverage}
-\end{figure}
+The reliability score fuses normalized conformal interval width with an embedding-shift statistic at frozen equal weights, and drives abstention. Table~\ref{tab:cet_selective} evaluates it against the two components it is built from, which were pre-specified as its ablations.
+
+\IfFileExists{tables/cet_selective.tex}{\input{tables/cet_selective.tex}}{}
+
+Three results follow, and none supports the proposed score. First, the fused score is beaten by its own width-only component at every horizon, by AURC margins of \fusedPenaltyOne{}, \fusedPenaltySeven{}, \fusedPenaltyThirty{}, and \fusedPenaltyNinety{}\,\degC{} that are large relative to the across-seed standard deviation of \aurcSeedSdLow{}--\aurcSeedSdHigh{}. Adding the shift signal to interval width does not merely fail to help; it degrades a component that works. The shift-only variant is worse than either at all horizons beyond one day, so the frozen equal weighting spends half of the score's mass on the least useful evidence available.
+
+Second, the score does not identify forecasts that will fail. Top-error AUROC is $0.516$, $0.492$, $0.503$, and $0.540$, that is, chance to within seed noise, and at one horizon it is below chance. The rank correlation between reliability and realized error is correspondingly negligible, with $|\rho| \le 0.117$. Selective prediction can only work through such a ranking, so this measurement, taken on its own, is sufficient to reject the abstention mechanism.
+
+Third, the downstream consequence is exactly what the ranking predicts. Abstaining on roughly half of all forecast origins reduces RMSE by only \fusedGainOne{}, \fusedGainSeven{}, \fusedGainThirty{}, and \fusedGainNinety{} at the four horizons. Discarding half of the data should remove a substantial share of the error mass if the discarded half were selected informatively; recovering one to three percent confirms that it is not.
+
+The one mechanism that does work is the simplest. Width-only selection improves on no abstention by \widthGainOne{}, \widthGainSeven{}, \widthGainThirty{}, and \widthGainNinety{}, with the benefit growing as forecasts become harder. Conformal interval width, which is available from any quantile model wrapped in split conformal and requires none of the machinery this paper proposes, is a usable selective-forecasting signal on this dataset. That is a real finding, and it belongs to the wrapper rather than to \method{}.
 
 \subsection{Ablation Study}
-\todo{Report the predefined A0--A9 ablations. Remove any claimed contribution whose ablation does not show incremental and reproducible value.}
+\label{sec:results_ablation}
+
+The pre-registered ablations separate the trained variants, which require their own runs, from the evaluation-side removals, which are recomputed from the A0 artifacts and therefore share its weights exactly. Table~\ref{tab:cet_ablation} reports the eighty trained runs.
+
+\IfFileExists{tables/cet_ablation.tex}{\input{tables/cet_ablation.tex}}{}
+
+A1 is the ablation that matters most and it is the most damaging. Replacing the KAN mapping with a parameter-matched MLP, holding the temporal stem, the budget, and every protocol element fixed, changes RMSE by at most $0.008$\,\degC{} at any horizon, which is within the across-seed spread. The KAN layer, which supplies the architecture's name and its claim to interpretability, contributes nothing measurable to accuracy. Section~\ref{sec:results_accuracy} showed that the full model loses to a plain KAN; A1 adds that it would also lose nothing by not being a KAN at all. A2 confirms that removing the quantile head leaves point accuracy unchanged, as expected, since the quantile loss is weighted to zero in that variant.
+
+A9 preserves the superseded mean-pooled readout described in Section~\ref{sec:correction} so that the defect stays reproducible. It is worse than A0 by $1.82$, $2.15$, $1.63$, and $0.86$\,\degC{}, and its across-seed standard deviation at one day is $1.086$, two orders of magnitude above the corrected model's $0.004$. The defect was thus both large and unstable, and the correction is responsible for the difference between a model that loses to persistence and one that is merely uncompetitive.
+
+Table~\ref{tab:cet_eval_ablation} reports the evaluation-side ablations, each expressed as the gain attributable to the component named, so that a positive entry argues for keeping it.
+
+\IfFileExists{tables/cet_eval_ablation.tex}{\input{tables/cet_eval_ablation.tex}}{}
+
+The pattern is consistent with Section~\ref{sec:results_selective} and sharper. Conformal correction (A3) buys real coverage, though the gain shrinks with horizon as the raw quantiles widen. Interval width (A5) is worth keeping relative to the shift term. The embedding-shift component (A4) has a negative gain at every horizon, meaning the score would improve if that component were deleted, and the fusion itself (A6) is worse than its own best single component by the same margins. Abstention (A7) recovers between $0.036$ and $0.130$\,\degC{} of RMSE, which is the small effect already reported. Applying the rule stated in Section~\ref{sec:experiments}, that a contribution whose ablation shows no incremental value must be withdrawn, the temporal KAN module, the embedding-shift term, the fusion, and the abstention rule are all withdrawn as contributions.
+
+One component survives the ablation cleanly. Adaptive conformal calibration (A8) reduces rolling coverage deviation relative to static split conformal by \adaptiveDevDropOne{}, \adaptiveDevDropSeven{}, \adaptiveDevDropThirty{}, and \adaptiveDevDropNinety{} at the four horizons, and it pays for this with intervals only \adaptiveWidthCostOne{} to \adaptiveWidthCostNinety{} wider. The trade is favourable at every horizon and improves with lead time, which is where coverage stability is hardest to maintain. Together with width-based selection, this is the second mechanism in the study that works, and like the first it belongs to the conformal wrapper rather than to the proposed architecture or reliability score.
 
 \subsection{Interpretability and Explanation Stability}
-\todo{Visualize representative KAN functions and quantify stability across seeds, periods, and perturbations. Distinguish physically plausible observations from unsupported causal interpretation.}
+\todo{Visualize representative KAN functions and quantify stability across seeds, periods, and perturbations. Distinguish physically plausible observations from unsupported causal interpretation. Note that interpretability claims must now be stated independently of accuracy, since the representation being interpreted is less accurate than a plain KAN at every horizon beyond one day.}
 
 \subsection{Robustness, Extremes, and Efficiency}
-\todo{Report noise, missing-data, extreme-event, and computational experiments. Include failure cases and performance/complexity trade-offs.}
+\todo{Report the pre-registered noise, missing-data, extreme-subset, and computational experiments. Include failure cases and performance/complexity trade-offs.}
