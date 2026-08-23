@@ -66,5 +66,18 @@ One component survives the ablation cleanly. Adaptive conformal calibration (A8)
 \subsection{Interpretability and Explanation Stability}
 \todo{Visualize representative KAN functions and quantify stability across seeds, periods, and perturbations. Distinguish physically plausible observations from unsupported causal interpretation. Note that interpretability claims must now be stated independently of accuracy, since the representation being interpreted is less accurate than a plain KAN at every horizon beyond one day.}
 
-\subsection{Robustness, Extremes, and Efficiency}
-\todo{Report the pre-registered noise, missing-data, extreme-subset, and computational experiments. Include failure cases and performance/complexity trade-offs.}
+\subsection{Climate Extremes}
+\label{sec:results_extremes}
+
+Extreme subsets are defined by the 5th and 95th percentiles of the training targets only, with each origin labelled from its first forecast lead, exactly as fixed in the pre-registered policy. No model is retrained; the stored test predictions are re-scored on the same origin partition, so differences between models are attributable to the models. Table~\ref{tab:cet_extremes} reports RMSE on the union of the cold and warm subsets.
+
+\IfFileExists{tables/cet_extremes.tex}{\input{tables/cet_extremes.tex}}{}
+
+The extreme-event claim fails on the same evidence as the aggregate one. TrustKAN is best at no horizon, and its deficit again widens with lead time, reaching $0.748$\,\degC{} behind the transformer at ninety days. There is no horizon at which the proposed model's behaviour on extremes compensates for its behaviour on average.
+
+Two features of the subsets deserve comment, because they bear on how such tables should be read. First, the partition is dominated by warm origins, $246$ against roughly $55$ cold ones at every horizon, so a single figure for "extremes" is largely a figure for warm extremes; both subsets clear the pre-registered minimum of thirty origins, but the cold subset is small enough that we report it separately rather than relying on the union alone. Cold origins are markedly harder for every model, by roughly one degree at one day. Second, at thirty and ninety days most models achieve \emph{lower} error on the extreme subset than on its complement. This is not evidence that extremes are easy: warm extremes in this record fall in summer, when English temperature variance is at its lowest, so the subset selects a low-variance regime as much as an extreme one. The comparison that remains valid is between models on the same subset, which is how Table~\ref{tab:cet_extremes} is constructed.
+
+The same reading exposes where TrustKAN's failure actually lies. At ninety days its extreme-subset RMSE of $3.587$\,\degC{} is well below its complement error of $4.512$\,\degC{}, so the degradation reported in Section~\ref{sec:results_accuracy} is concentrated on ordinary days rather than on the rare events the framework was intended to help with.
+
+\subsection{Robustness and Efficiency}
+\todo{Report the pre-registered noise and missing-data corruptions. These require re-running the trained models on corrupted test histories; model weights were not retained by the benchmark runner, so this requires re-execution under the frozen protocol and is left as unfinished work rather than reported from partial evidence. Computational cost is recorded per run in the ledgers and should be tabulated here.}

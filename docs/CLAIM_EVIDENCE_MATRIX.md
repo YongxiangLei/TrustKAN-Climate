@@ -15,7 +15,7 @@ This file prevents manuscript claims from outrunning experimental evidence.
 | Selective forecasting reduces risk | Origin-wise risk–coverage curves, AURC, retained-set error and width-only/shift-only ablations | **Refuted on CET.** The fused score loses to its own width-only component at every horizon, and discarding half the origins cuts RMSE by only 1-3% |
 | Method is robust to corrupted inputs | Noise, random missingness and block missingness experiments | Protocol frozen; full evidence pending |
 | Method is computationally practical | Parameter count, memory, training time and CPU/GPU inference latency | Timing pipeline validated; full evidence pending |
-| Method is useful on climate extremes | Pre-defined extreme subsets and event-tail metrics with uncertainty coverage | Protocol frozen; full evidence pending |
+| Method is useful on climate extremes | Pre-defined extreme subsets and event-tail metrics with uncertainty coverage | **Refuted on CET.** On the frozen 5th/95th-percentile subsets TrustKAN is best at no horizon, trailing the transformer by 0.10, 0.19, 0.28 and 0.75 degC at h1/h7/h30/h90 |
 
 ## Rule
 Do not mark a row Supported until raw experiment outputs, configuration, seeds and an analysis artifact all exist. A supported claim must link to its generated result files before inclusion in the abstract or conclusion.
@@ -91,14 +91,37 @@ The evaluation-side gains, positive meaning the component earns its place:
 | A7 abstention | +0.039 | +0.036 | +0.040 | +0.130 |
 | A8 adaptive conformal | +0.005 | +0.011 | +0.016 | +0.024 |
 
+## CET extreme-subset outcome, 2026-08
+
+Scored on the frozen subsets from the stored predictions, with no retraining.
+Union of cold and warm origins, mean over five seeds, test RMSE in degC:
+
+| model | h1 | h7 | h30 | h90 |
+|---|---|---|---|---|
+| transformer | 2.450 | 2.761 | 2.725 | 2.839 |
+| kan (plain) | 2.560 | 2.943 | 2.765 | 2.853 |
+| trustkan | 2.547 | 2.953 | 3.001 | 3.587 |
+
+Two cautions for anyone reusing this table. The union is dominated by warm
+origins (246 against about 55 cold), so it largely measures warm extremes; cold
+origins are about a degree harder for every model. And at h30/h90 most models
+score *better* on the extreme subset than on its complement, because warm
+extremes here fall in summer when English temperature variance is lowest. Only
+the between-model comparison on a fixed subset is meaningful.
+
+Notably, TrustKAN's h90 extreme-subset error (3.587) is well below its
+complement error (4.512), so its degradation is concentrated on ordinary days
+rather than on the rare events the framework targeted.
+
 ## Summary
 
 Of the five intended contributions, four are withdrawn: the temporal KAN module,
 the embedding-shift term, the reliability fusion, and the abstention rule each
-fail the ablation that was pre-specified to test them. What survives belongs to
-the conformal wrapper rather than to the proposed method: conformal correction
-improves coverage, interval width alone drives useful selective forecasting, and
-adaptive conformal materially improves coverage stability under drift.
+fail the ablation that was pre-specified to test them. The extreme-event claim
+fails on the same evidence. What survives belongs to the conformal wrapper
+rather than to the proposed method: conformal correction improves coverage,
+interval width alone drives useful selective forecasting, and adaptive conformal
+materially improves coverage stability under drift.
 
 The pre-registration is doing exactly the job it was written for. Reporting these
 as negative results, rather than retuning the frozen fusion weights until a claim
