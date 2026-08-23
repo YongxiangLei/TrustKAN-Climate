@@ -13,7 +13,7 @@ This file prevents manuscript claims from outrunning experimental evidence.
 | Representation changes help reveal climate shift | Quantitative drift protocol or carefully defined temporal diagnostics | Planned |
 | Reliability score predicts forecast failure | Error-vs-reliability association and top-error AUROC/AUPRC against width-only and shift-only components | **Refuted on CET.** Top-error AUROC is 0.516/0.492/0.503/0.540 across h1/h7/h30/h90, i.e. chance. AUPRC matches the base rate and the error-reliability Spearman correlation is |rho| <= 0.12 |
 | Selective forecasting reduces risk | Origin-wise risk–coverage curves, AURC, retained-set error and width-only/shift-only ablations | **Refuted on CET.** The fused score loses to its own width-only component at every horizon, and discarding half the origins cuts RMSE by only 1-3% |
-| Method is robust to corrupted inputs | Noise, random missingness and block missingness experiments | Protocol frozen; full evidence pending |
+| Method is robust to corrupted inputs | Noise, random missingness and block missingness experiments | **Refuted on CET.** TrustKAN is the most fragile of the three models at all 9 pre-registered levels: noise 3.5% vs 1.6% (plain KAN) and 2.3% (transformer), 40% random missingness 33.0% vs 17.4%/26.9%, one-day block 51.1% vs 25.6%/40.6%. Block cost saturates at 3 days (80.8% for both 3-day and 7-day, bit-identical in 100% of runs) because the readout only sees 3 trailing timesteps |
 | Method is computationally practical | Parameter count, memory, training time and CPU/GPU inference latency | **Supported, but it explains nothing.** On one RTX 2060 TrustKAN uses 58,496 parameters, 58.4 s to train and 0.097 ms per origin, mid-pack on all three; the transformer that beats it at every horizon is the largest and slowest. Cost does not account for the accuracy ordering |
 | Method is useful on climate extremes | Pre-defined extreme subsets and event-tail metrics with uncertainty coverage | **Refuted on CET.** On the frozen 5th/95th-percentile subsets TrustKAN is best at no horizon, trailing the transformer by 0.10, 0.19, 0.28 and 0.75 degC at h1/h7/h30/h90 |
 
@@ -143,12 +143,46 @@ of a convolutional stem, so its inputs are latent channels rather than observed
 variables; even a stable curve would describe a coordinate of the model's own
 making. No physical reading is drawn from these curves.
 
+## CET robustness outcome, 2026-08
+
+Sixty runs (3 models x 4 horizons x 5 seeds) retrained under the frozen protocol.
+Each sweep begins with the clean history and is accepted only when that RMSE
+equals the benchmark ledger value, so the corrupted entries are anchored to the
+reported models. Percentage increase in test RMSE over the clean forecast,
+averaged over horizons and seeds:
+
+| corruption | level | trustkan | kan (plain) | transformer |
+|---|---|---|---|---|
+| noise | strongest pre-registered | 3.5% | 1.6% | 2.3% |
+| random missing | 40% | 33.0% | 17.4% | 26.9% |
+| block missing | 1 day | 51.1% | 25.6% | 40.6% |
+| block missing | 3 days | 80.8% | 29.1% | 40.7% |
+| block missing | 7 days | 80.8% | 32.2% | 41.9% |
+
+TrustKAN is the most fragile model at every corruption and every level, so the
+robustness claim fails in the same direction as the accuracy and reliability
+claims. The block column also behaves impossibly: extending the mask from 3 to
+7 days does not change TrustKAN's error at all, and the two are bit-identical in
+100% of runs against 0% for both comparators.
+
+Identical errors mean the extra masked days were never read. Perturbing one
+timestep at a time and checking which perturbations move the forecast gives the
+effective receptive field directly: 3 timesteps for TrustKAN against the full 365
+for the plain KAN and the transformer. The configured history is a year and the
+model sees three days of it. This is an architectural property of the dilated
+convolutional stem, independent of the readout defect corrected earlier, and it
+explains both the 90-day accuracy collapse and the block fragility. It also
+qualifies the A1 and plain-KAN comparisons: they are sound as paired tests but do
+not isolate the KAN mapping, since the models being compared see different
+amounts of history.
+
 ## Summary
 
 Of the five intended contributions, four are withdrawn: the temporal KAN module,
 the embedding-shift term, the reliability fusion, and the abstention rule each
-fail the ablation that was pre-specified to test them. The extreme-event claim
-fails on the same evidence. What survives belongs to the conformal wrapper
+fail the ablation that was pre-specified to test them. The extreme-event and
+robustness claims fail on the same evidence, and the interpretability claim fails
+against its own controls. What survives belongs to the conformal wrapper
 rather than to the proposed method: conformal correction improves coverage,
 interval width alone drives useful selective forecasting, and adaptive conformal
 materially improves coverage stability under drift.
