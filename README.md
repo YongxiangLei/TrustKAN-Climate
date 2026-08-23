@@ -200,6 +200,16 @@ python scripts/aggregate_results.py \
   --min-seeds 5
 ```
 
+The falsifiable A0--A8 ablations run from one frozen CET protocol. Only A0--A2
+need training; the rest are recomputed from the A0 artifact:
+
+```bash
+python scripts/run_ablations.py --config configs/ablations.yaml --resume --device cuda:0
+```
+
+See `docs/TRUSTKAN_ABLATIONS.md` for the hypothesis and failure criterion
+attached to each variant.
+
 Robustness and extreme-event labels are also pre-registered in
 `configs/robustness.yaml` and `docs/ROBUSTNESS_PROTOCOL.md`. They may be scored
 only after raw prediction artifacts exist:
