@@ -6,9 +6,12 @@ cost stops growing once the block passes a certain length. That saturation point
 is a property of the architecture, not of the data: it is the number of trailing
 timesteps the readout can still see.
 
-This module measures that number directly, by perturbing one timestep at a time
-and recording the furthest position back that still moves the forecast. Reported
-beside the sweep, it turns "the model is fragile to recent gaps" into a
+That number is measured by scripts/run_receptive_field.py, on retrained weights
+that reproduce the benchmark ledger, and is read here rather than recomputed.
+Measuring it on a freshly initialized model would answer a question about the
+architecture; the paper needs the answer for the models it reports, so the
+measurement belongs with the runners that can prove which models those are.
+Reported beside the sweep, it turns "the model is fragile to recent gaps" into a
 statement about how much of the history each architecture actually consumes.
 """
 from __future__ import annotations
@@ -17,70 +20,59 @@ import argparse
 from pathlib import Path
 
 import pandas as pd
-import torch
 
 try:
     import _bootstrap  # noqa: F401  # file-path execution
 except ModuleNotFoundError:
     from scripts import _bootstrap  # noqa: F401  # module execution
 
-from scripts.run_cet_benchmark import build_model, load_config
 from scripts.run_robustness_campaign import MODELS
 
 ROOT = Path(__file__).resolve().parents[1]
 GRID = ROOT / "results" / "robustness" / "aggregated" / "cet_robustness_grid.csv"
+FIELDS = ROOT / "results" / "robustness" / "aggregated" / "cet_receptive_fields.csv"
 LABELS = {"trustkan": "TrustKAN", "kan": "KAN (plain)", "transformer": "Transformer"}
 KIND_LABELS = {
     "noise": "Gaussian noise",
     "random_missing": "Random missing",
     "block_missing": "Recent block missing",
 }
-HORIZONS = (1, 7, 30, 90)
 
 
-def forecast(model, x: torch.Tensor) -> torch.Tensor:
-    out = model(x)
-    return out["point"] if isinstance(out, dict) else out
+def receptive_fields() -> pd.DataFrame:
+    """One reach per model, from the runner's ledger-verified measurements.
 
-
-def receptive_field(model, history: int, tolerance: float = 1e-6) -> int:
-    """Trailing timesteps that can still change the forecast.
-
-    A model that consumes its whole window returns the window length; one whose
-    readout sees only the end of the sequence returns that much smaller number,
-    and the difference is what the block-missing column measures.
+    The runner measures every horizon separately. A reach that varied with the
+    horizon would mean the number describes a trained instance rather than the
+    architecture, so disagreement is refused rather than averaged away.
     """
-    model = model.eval()
-    base = torch.zeros(1, history, 1)
-    with torch.no_grad():
-        reference = forecast(model, base)
-        reach = 0
-        for offset in range(history):
-            probe = base.clone()
-            probe[0, history - 1 - offset, 0] = 10.0
-            if not torch.allclose(forecast(model, probe), reference, atol=tolerance):
-                reach = offset + 1
-    return reach
-
-
-def receptive_fields(config: str) -> pd.DataFrame:
-    cfg = load_config(config)
-    history = int(cfg["window"]["history"])
-    rows = []
-    for name in MODELS:
-        torch.manual_seed(0)
-        model = build_model(name, history, HORIZONS[0], seed=0)
-        reach = receptive_field(model, history)
-        rows.append(
-            {
-                "model": name,
-                "history": history,
-                "receptive_field": reach,
-                "history_used": reach / history,
-            }
+    if not FIELDS.exists():
+        raise SystemExit(
+            f"missing {FIELDS.relative_to(ROOT)}; run scripts/run_receptive_field.py"
         )
-        print(f"  {LABELS[name]:<12} sees {reach} of {history} timesteps")
-    return pd.DataFrame(rows)
+    frame = pd.read_csv(FIELDS)
+    spread = frame.groupby("model").receptive_field.nunique()
+    if (spread > 1).any():
+        raise SystemExit(
+            f"receptive field varies with horizon for {list(spread[spread > 1].index)}; "
+            "it cannot be reported as a property of the architecture"
+        )
+    if not frame.reproduced.all():
+        raise SystemExit("some receptive-field runs did not reproduce the ledger RMSE")
+    rows = frame.groupby("model", as_index=False).agg(
+        history=("history", "first"),
+        receptive_field=("receptive_field", "first"),
+        control_receptive_field=("control_receptive_field", "first"),
+        horizons=("horizon", "nunique"),
+    )
+    rows["history_used"] = rows.receptive_field / rows.history
+    for row in rows.itertuples():
+        print(
+            f"  {LABELS[row.model]:<12} sees {row.receptive_field} of {row.history} "
+            f"timesteps across {row.horizons} horizons "
+            f"(untrained control {row.control_receptive_field})"
+        )
+    return rows
 
 
 def robustness_table(grid: pd.DataFrame, fields: pd.DataFrame, out: Path) -> None:
@@ -152,7 +144,9 @@ def block_saturation(grid: pd.DataFrame) -> pd.Series:
 
 
 def macros(grid: pd.DataFrame, fields: pd.DataFrame, out: Path) -> None:
-    reach = fields.set_index("model").receptive_field
+    indexed = fields.set_index("model")
+    reach = indexed.receptive_field
+    control = indexed.control_receptive_field
     saturation = block_saturation(grid)
     corrupted = grid[grid.kind.ne("clean")]
     names = {"trustkan": "Trust", "kan": "Kan", "transformer": "Transformer"}
@@ -166,6 +160,7 @@ def macros(grid: pd.DataFrame, fields: pd.DataFrame, out: Path) -> None:
         if subset.empty:
             continue
         macro(f"robustField{short}", f"{int(reach[model])}")
+        macro(f"robustControl{short}", f"{int(control[model])}")
         macro(f"robustSaturated{short}", f"{100 * saturation.get(model, 0):.0f}\\%")
         block = subset[subset.kind.eq("block_missing")]
         macro(f"robustBlockOne{short}", pct(block[block.level.eq(1)]))
@@ -176,6 +171,7 @@ def macros(grid: pd.DataFrame, fields: pd.DataFrame, out: Path) -> None:
         missing = subset[subset.kind.eq("random_missing") & subset.level.eq(0.40)]
         macro(f"robustMissing{short}", pct(missing))
     macro("robustHistory", f"{int(fields.history.iloc[0])}")
+    macro("robustFieldHorizons", f"{int(fields.horizons.iloc[0])}")
     macro("robustSeeds", f"{grid.model_seed.nunique()}")
     macro("robustRuns", f"{len(grid.groupby(['model', 'horizon', 'model_seed']))}")
     macro("robustLevels", f"{corrupted.groupby(['kind', 'level']).ngroups}")
@@ -188,12 +184,9 @@ def pct(frame: pd.DataFrame) -> str:
     return "--" if frame.empty else f"{100 * frame.relative_increase.mean():.1f}\\%"
 
 
-def main(config: str, outdir: Path) -> None:
+def main(outdir: Path) -> None:
     print("receptive fields")
-    fields = receptive_fields(config)
-    aggregated = ROOT / "results" / "robustness" / "aggregated"
-    aggregated.mkdir(parents=True, exist_ok=True)
-    fields.to_csv(aggregated / "cet_receptive_fields.csv", index=False)
+    fields = receptive_fields()
     if not GRID.exists():
         raise SystemExit(
             f"missing {GRID.relative_to(ROOT)}; run scripts/run_robustness_campaign.py"
@@ -206,7 +199,6 @@ def main(config: str, outdir: Path) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", default="configs/cet.yaml")
     parser.add_argument("--outdir", default=str(ROOT / "paper" / "tables"))
     args = parser.parse_args()
-    main(args.config, Path(args.outdir))
+    main(Path(args.outdir))

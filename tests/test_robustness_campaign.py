@@ -101,34 +101,34 @@ def test_last_state_readout_sees_only_three_timesteps():
     # of three steps, so a 365-day history reaches the readout as three days.
     # This is why block corruption saturates at length three in the sweep, and
     # a change to the stem that widened it would invalidate that reading.
-    from scripts.analyze_robustness import receptive_field
+    from scripts.run_receptive_field import receptive_field
 
     torch.manual_seed(0)
     model = TrustKAN(1, horizon=2, hidden_dim=8, grid_size=4)
-    assert receptive_field(model, history=40) == 3
+    assert receptive_field(model, 40, torch.device('cpu')) == 3
 
 
 def test_the_comparators_consume_their_whole_window():
     # The deficit is attributed to how much history reaches the readout, so it
     # matters that both pre-specified comparators are not similarly limited.
-    from scripts.analyze_robustness import receptive_field
+    from scripts.run_receptive_field import receptive_field
     from src.models.baselines import TransformerForecaster
     from src.models.kan_baseline import StandardKANForecaster
 
     torch.manual_seed(0)
-    assert receptive_field(StandardKANForecaster(24, 1, 2, hidden_dim=8, grid_size=4), 24) == 24
-    assert receptive_field(TransformerForecaster(1, 2), 24) == 24
+    assert receptive_field(StandardKANForecaster(24, 1, 2, hidden_dim=8, grid_size=4), 24, torch.device('cpu')) == 24
+    assert receptive_field(TransformerForecaster(1, 2), 24, torch.device('cpu')) == 24
 
 
 def test_the_mean_pooled_defect_saw_the_whole_window():
     # The superseded readout averaged every position, so it reached all of the
     # history and lost recency instead; neither configuration gives the model
     # what the comparators have.
-    from scripts.analyze_robustness import receptive_field
+    from scripts.run_receptive_field import receptive_field
 
     torch.manual_seed(0)
     model = TrustKAN(1, horizon=2, hidden_dim=8, grid_size=4, readout="mean")
-    assert receptive_field(model, history=24) == 24
+    assert receptive_field(model, 24, torch.device('cpu')) == 24
 
 
 def test_block_corruption_saturates_at_the_receptive_field():
