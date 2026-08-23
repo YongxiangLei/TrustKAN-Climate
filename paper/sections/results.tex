@@ -8,11 +8,11 @@ Every number in this section is emitted by \texttt{scripts/make\_paper\_tables.p
 
 Table~\ref{tab:cet_rmse} reports test RMSE for all ten models. \method{} is mid-pack at one day and deteriorates faster than every learned baseline as lead time grows, ending last of them at ninety days. Its ninety-day error exceeds what persistence achieves at thirty, so the model is beaten across a threefold increase in lead time by copying the last observation; it stays ahead of persistence at a matched horizon, which is the weakest bar the benchmark contains. The transformer is best at all four horizons. The pattern is not seed noise: \method's standard deviation across seeds is at most $0.003$\,\degC{}, an order of magnitude smaller than the gaps being discussed, so the model is converging reliably to a worse solution rather than converging unstably.
 
-\IfFileExists{tables/cet_rmse.tex}{\input{tables/cet_rmse.tex}}{}
+\generated{tables/cet_rmse.tex}
 
 Table~\ref{tab:cet_paired} reports the pre-specified comparison family. Two comparators were fixed in advance: a budget-matched plain KAN, which isolates the temporal KAN module because it removes that module while holding the parameter budget and every protocol element constant, and the transformer, which was designated the strongest neural baseline. Each of the forty pairs shares a forecast origin set and a seed, so the bootstrap resamples matched errors, and Holm correction is applied across each comparator's twenty-comparison family. Correction does not change any conclusion: every significant pair attains the smallest achievable bootstrap significance level at $5000$ resamples.
 
-\IfFileExists{tables/cet_paired.tex}{\input{tables/cet_paired.tex}}{}
+\generated{tables/cet_paired.tex}
 
 \method{} wins none of the forty comparisons. Against the plain KAN, the one-day interval includes zero for all five seeds, so the two are indistinguishable there; at 7, 30, and 90 days the plain KAN is significantly better for every seed, with the mean penalty rising monotonically from $0.147$ to $1.403$\,\degC{}. Against the transformer, the comparator is significantly better for every seed at every horizon, including at one day, where the mean gap of $0.068$\,\degC{} is small but consistent enough that no interval covers zero.
 
@@ -23,7 +23,7 @@ The comparison against the plain KAN is the decisive one, because it is the abla
 
 Table~\ref{tab:cet_calibration} reports calibration at a nominal level of $0.90$.
 
-\IfFileExists{tables/cet_calibration.tex}{\input{tables/cet_calibration.tex}}{}
+\generated{tables/cet_calibration.tex}
 
 Marginal coverage is accurate at all four horizons, deviating from nominal by at most \maxCoverageDeviation{} percentage points. This is the clearest positive result in the study and also the least informative one. Split conformal calibration guarantees marginal coverage under exchangeability of the calibration and test residuals, for any underlying predictor; the same wrapper applied to the persistence baseline would produce the same property. The result therefore confirms that the calibration partition and the conformal implementation are correct, and it says nothing about the KAN representation.
 
@@ -34,7 +34,7 @@ The quantity that a practitioner would rely on behaves quite differently. Joint 
 
 The reliability score fuses normalized conformal interval width with an embedding-shift statistic at frozen equal weights, and drives abstention. Table~\ref{tab:cet_selective} evaluates it against the two components it is built from, which were pre-specified as its ablations.
 
-\IfFileExists{tables/cet_selective.tex}{\input{tables/cet_selective.tex}}{}
+\generated{tables/cet_selective.tex}
 
 Three results follow, and none supports the proposed score. First, the fused score is beaten by its own width-only component at every horizon, by AURC margins of \fusedPenaltyOne{}, \fusedPenaltySeven{}, \fusedPenaltyThirty{}, and \fusedPenaltyNinety{}\,\degC{} that are large relative to the across-seed standard deviation of \aurcSeedSdLow{}--\aurcSeedSdHigh{}. Adding the shift signal to interval width does not merely fail to help; it degrades a component that works. The shift-only variant is worse than either at all horizons beyond one day, so the frozen equal weighting spends half of the score's mass on the least useful evidence available.
 
@@ -67,7 +67,7 @@ Figure~\ref{fig:risk_coverage} shows the full risk--coverage trade-off behind th
 
 The pre-registered ablations separate the trained variants, which require their own runs, from the evaluation-side removals, which are recomputed from the A0 artifacts and therefore share its weights exactly. Table~\ref{tab:cet_ablation} reports the eighty trained runs.
 
-\IfFileExists{tables/cet_ablation.tex}{\input{tables/cet_ablation.tex}}{}
+\generated{tables/cet_ablation.tex}
 
 A1 is the ablation that matters most and it is the most damaging. Replacing the KAN mapping with a parameter-matched MLP, holding the temporal stem, the budget, and every protocol element fixed, changes RMSE by at most $0.008$\,\degC{} at any horizon, which is within the across-seed spread. The KAN layer, which supplies the architecture's name and its claim to interpretability, contributes nothing measurable to accuracy. Section~\ref{sec:results_accuracy} showed that the full model loses to a plain KAN; A1 adds that it would also lose nothing by not being a KAN at all. A2 confirms that removing the quantile head leaves point accuracy unchanged, as expected, since the quantile loss is weighted to zero in that variant.
 
@@ -75,7 +75,7 @@ A9 preserves the superseded mean-pooled readout described in Section~\ref{sec:co
 
 Table~\ref{tab:cet_eval_ablation} reports the evaluation-side ablations, each expressed as the gain attributable to the component named, so that a positive entry argues for keeping it.
 
-\IfFileExists{tables/cet_eval_ablation.tex}{\input{tables/cet_eval_ablation.tex}}{}
+\generated{tables/cet_eval_ablation.tex}
 
 The pattern is consistent with Section~\ref{sec:results_selective} and sharper. Conformal correction (A3) buys real coverage, though the gain shrinks with horizon as the raw quantiles widen. Interval width (A5) is worth keeping relative to the shift term. The embedding-shift component (A4) has a negative gain at every horizon, meaning the score would improve if that component were deleted, and the fusion itself (A6) is worse than its own best single component by the same margins. Abstention (A7) recovers between $0.036$ and $0.130$\,\degC{} of RMSE, which is the small effect already reported. Applying the rule stated in Section~\ref{sec:experiments}, that a contribution whose ablation shows no incremental value must be withdrawn, the temporal KAN module, the embedding-shift term, the fusion, and the abstention rule are all withdrawn as contributions.
 
@@ -110,14 +110,16 @@ The second property is whether a curve means anything stable across runs, which 
 
 Two weaker readings might rescue the claim, and both fail against their own controls. The first notes that matched curves correlate strongly in magnitude, at \curveMatchedAbs{}, with only the sign varying; sign is a symmetry the downstream weights can absorb, so this would suggest correspondence up to a flip. But pairing each curve with an unrelated curve from the other run gives \curveShuffledAbs{}, and the two never differ by more than \curveAbsExcessMax{}. The apparent agreement is a property of the narrow shape space, not of the index. The second reading gives up on indices and asks only whether the same shapes reappear somewhere; the best-match correlation is \curveBestMatchOne{} to \curveBestMatchNinety{}, near perfect. Its control settles it: the same statistic computed within a single run, matching each curve to the most similar \emph{other curve of the same model}, gives \curveControlOne{} to \curveControlNinety{}, differing from the cross-seed value by at most \curveExcessMax{}. With thousands of curves drawn from a three-dimensional space of shapes, a near-identical partner always exists, and finding one across seeds carries no information about reproducibility.
 
-We therefore report the interpretability claim as refuted on CET in the same sense as the others: the curves are individually unstable, their apparent stability is an artifact of low shape diversity, and they are mostly near-linear. A further limitation is structural rather than empirical. The KAN layer operates on the output of a convolutional temporal stem, so its inputs are learned latent channels, not observed variables. Even a perfectly stable curve would describe the model's relationship to a coordinate of its own making, and recovering a physical reading would require an additional and separately justified attribution step that this architecture does not provide. We draw no physical conclusions from these curves.
+We therefore report the interpretability claim as refuted on CET in the same sense as the others: the curves are individually unstable, their apparent stability is an artifact of low shape diversity, and they are mostly near-linear.
+
+Two further limitations are structural rather than empirical, and the second is the more serious. The KAN layer operates on the output of a convolutional temporal stem, so its inputs are learned latent channels, not observed variables. Even a perfectly stable curve would describe the model's relationship to a coordinate of its own making, and recovering a physical reading would require an additional and separately justified attribution step that this architecture does not provide. Beyond that, Section~\ref{sec:results_receptive} shows that those latent channels are computed from the last \robustFieldTrust{} of the \robustHistory{} available timesteps. Whatever the curves describe, it is a function of three days of weather, not of the year of history the setup implies. This bounds the claim more tightly than the instability does: even had the curves been perfectly reproducible, they would document a mapping over a window the model was never given credit for reading, and stability of a mapping that ignores almost all of its nominal input is not evidence of insight into the system being forecast. We draw no physical conclusions from these curves.
 
 \subsection{Climate Extremes}
 \label{sec:results_extremes}
 
 Extreme subsets are defined by the 5th and 95th percentiles of the training targets only, with each origin labelled from its first forecast lead, exactly as fixed in the pre-registered policy. No model is retrained; the stored test predictions are re-scored on the same origin partition, so differences between models are attributable to the models. Table~\ref{tab:cet_extremes} reports RMSE on the union of the cold and warm subsets.
 
-\IfFileExists{tables/cet_extremes.tex}{\input{tables/cet_extremes.tex}}{}
+\generated{tables/cet_extremes.tex}
 
 The extreme-event claim fails on the same evidence as the aggregate one. TrustKAN is best at no horizon, and its deficit again widens with lead time, reaching $0.748$\,\degC{} behind the transformer at ninety days. There is no horizon at which the proposed model's behaviour on extremes compensates for its behaviour on average.
 
@@ -130,16 +132,16 @@ The same reading exposes where TrustKAN's failure actually lies. At ninety days 
 
 Cost is recorded for every run in the ledger, and Table~\ref{tab:cet_efficiency} reports it for the models that shared one accelerator. We include it not because efficiency is a contribution but because it closes an alternative explanation for the accuracy ordering: a reader might suspect that \method{} was starved of capacity or compute relative to the baselines that beat it.
 
-\IfFileExists{tables/cet_efficiency.tex}{\input{tables/cet_efficiency.tex}}{}
+\generated{tables/cet_efficiency.tex}
 
 It was not. \method{} sits in the middle of the range on all three measures, and the transformer that beats it at every horizon is the largest and slowest model in the table, which is the direction one would expect if capacity were the binding constraint. The plain KAN that beats it at every horizon beyond one day is larger in parameters but trains in roughly half the wall-clock time, because the temporal recurrence rather than the KAN layers dominates \method's cost. The architecture therefore pays for a component that A1 shows contributes nothing measurable to accuracy. All models are cheap in absolute terms at this problem size, so none of these differences would drive a deployment decision; the relevant conclusion is only that compute does not explain the results in Section~\ref{sec:results_accuracy}.
 
 \subsection{Robustness to Corrupted Inputs}
 \label{sec:results_robustness}
 
-The pre-registered corruptions apply to test histories only, so a model is trained once and queried on each perturbed copy. Because the benchmark stored predictions rather than weights, the \robustRuns{} runs behind this section are retrained under the frozen protocol; the sweep validates itself, since its first entry is the clean history and its RMSE must equal the benchmark ledger value before the corrupted entries are accepted. Scope is the pre-specified comparison family of Section~\ref{sec:results_accuracy}. Table~\ref{tab:cet_robustness} reports the \robustLevels{} corruption levels.
+The pre-registered corruptions apply to test histories only, so a model is trained once and queried on each perturbed copy. Because the benchmark stored predictions rather than weights, the \robustRuns{} runs behind this section are retrained under the frozen protocol, which raises the question of whether they are the models reported above or merely models trained the same way. The sweep answers it by construction: its first grid entry is the clean history, and a run is refused unless that clean RMSE reproduces the benchmark ledger. All \robustRuns{} were accepted, and the agreement is stronger than the gate requires, since the retrained clean forecasts are identical to the stored benchmark predictions in every element of every run. Identical predictions are not something two differently trained models produce, so the corrupted cells describe the reported models rather than replicas of them. Scope is the pre-specified comparison family of Section~\ref{sec:results_accuracy}. Table~\ref{tab:cet_robustness} reports the \robustLevels{} corruption levels.
 
-\IfFileExists{tables/cet_robustness.tex}{\input{tables/cet_robustness.tex}}{}
+\generated{tables/cet_robustness.tex}
 
 The robustness claim fails, and it fails in the same direction as the rest. \method{} is the most fragile of the three models at every corruption and every level: additive noise at the strongest pre-registered scale costs it \robustNoiseTrust{} against \robustNoiseKan{} for the plain KAN, scattered missingness at $40\%$ costs it \robustMissingTrust{} against \robustMissingKan{}, and masking a single recent day costs it \robustBlockOneTrust{} against \robustBlockOneKan{}. No level exists at which the proposed model degrades more gracefully than the comparator it was designed to improve upon.
 
@@ -149,6 +151,8 @@ The robustness claim fails, and it fails in the same direction as the rest. \met
 One column of the table behaves unlike a robustness curve. Extending the masked block from three days to seven does not raise \method's error at all: the two are not merely close but bit-identical in \robustSaturatedTrust{} of the runs, against \robustSaturatedKan{} and \robustSaturatedTransformer{} for the two comparators. Identical errors mean the extra masked days were never read.
 
 Measuring the readout directly confirms the reason. Perturbing one timestep at a time and recording the furthest position that still moves the forecast, \method's readout reaches \robustFieldTrust{} of its \robustHistory{} timesteps, while both comparators reach all \robustHistory{}. Two kernel-3 convolutions and a final-state readout give the architecture a receptive field of three steps, so the year of history it is given arrives as three days. The saturation in the table is the empirical signature of that limit.
+
+Because this measurement now carries weight the corruption sweep alone did not, it is made on the reported models rather than on the architecture in the abstract: each model is retrained under the frozen protocol and is measured only after its test RMSE reproduces the benchmark ledger, at all \robustFieldHorizons{} horizons. The reach does not vary with horizon, and a randomly initialized control of the same architecture gives the same \robustControlTrust{}, \robustControlKan{}, and \robustControlTransformer{} timesteps as the trained models. Agreement between the trained and untrained measurements is what identifies this as a structural property of the design rather than something a particular optimization run happened to produce.
 
 This is the most consequential measurement in the paper, because it is a mechanism rather than another symptom. The accuracy deficit of Section~\ref{sec:results_accuracy} grows monotonically with lead time, which is exactly what a three-day view predicts: at ninety days the comparators can condition on a full seasonal cycle and \method{} cannot. It also reframes the defect of Section~\ref{sec:correction}. The superseded mean-pooled readout reached the whole window but averaged it, destroying recency; the corrected last-state readout preserves recency but reaches almost none of the window. Neither configuration gave the model what its comparators had, which is why correcting the defect produced a competitive one-day forecast and left the long horizons where they were.
 

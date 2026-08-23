@@ -28,7 +28,18 @@ where $b_k$ denotes a learnable base mapping and $\phi_{kj}$ is a learnable univ
 \end{equation}
 with grid centers $\mu_g$, coefficients $c_{kjg}$, and positive scales $\sigma_{jg}$. This functional decomposition is motivated by the interpretable edge-function view of KANs \cite{liu2025kan}.
 
-The resulting temporal representation is pooled to obtain an embedding $\mathbf{e}_t\in\mathbb{R}^{m}$. This embedding feeds the forecasting heads and also provides a representation space for shift assessment.
+The resulting temporal representation is reduced to an embedding $\mathbf{e}_t\in\mathbb{R}^{m}$ by taking the final encoder state, matching the recurrent and attention baselines. An earlier implementation averaged the states over the whole window instead; Section~\ref{sec:correction} reports that defect and its correction. This embedding feeds the forecasting heads and also provides a representation space for shift assessment.
+
+Two consequences of this stem are worth stating here, because both are measured later and neither is visible in the equations. Composing two kernel-3 convolutions with a final-state readout bounds how far back $\mathbf{e}_t$ can depend on $\mathbf{X}_t$, and Section~\ref{sec:results_receptive} measures that bound at $\robustFieldTrust{}$ of the $\robustHistory{}$ available steps. The $\phi_{kj}$ of \eqref{eq:kanmap} are therefore univariate functions of learned latent channels computed from that short window, not of observed variables over the look-back period, which constrains what any reading of them can mean.
+
+Figure~\ref{fig:framework} shows the full framework as it was pre-registered and evaluated. We draw it here rather than after the results so that the design under test is stated before its assessment, and we mark on it the components that Section~\ref{sec:results} withdraws, so that no reader takes the diagram for a working system.
+
+\begin{figure*}[t]
+\centering
+\resizebox{\textwidth}{!}{\input{figures/trustkan_framework.tex}}
+\caption{The \method{} framework as pre-registered: a temporal encoder feeding a KAN functional layer, joint point and quantile heads, conformal calibration, a representation-shift score, their fusion into a reliability score, and a selective gate. Hatched components are those the pre-specified ablations withdraw or refute (Sections~\ref{sec:results_ablation} and \ref{sec:results_interpretability}); what remains solid is the conformal wrapper and the interval-width score. The encoder is annotated with the reach measured in Section~\ref{sec:results_receptive}, which is the number of trailing timesteps that can influence $\mathbf{e}_t$.}
+\label{fig:framework}
+\end{figure*}
 
 \subsection{Joint Point and Quantile Forecasting}
 The point head predicts

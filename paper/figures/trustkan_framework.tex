@@ -1,27 +1,40 @@
 % Editable vector framework figure for TrustKAN-Climate.
+%
+% This diagram shows the design that was pre-registered and evaluated, not a
+% design that works. Components the ablations withdrew are drawn hatched and
+% labelled as such, so the figure cannot be read as a claim the results refute.
+% The encoder carries its measured reach for the same reason: a box labelled
+% only "temporal encoder" beside a year-long history would imply a span the
+% model does not have.
+% The picture is scaled to \textwidth, so the readable size of a label is its
+% font size times that scale. Node widths set the natural width and therefore
+% the scale; a larger font only adds line wraps, making the boxes taller without
+% shrinking anything further. That is why the font here is deliberately large.
 \begin{tikzpicture}[
-  font=\footnotesize,
+  font=\large,
   node distance=6mm and 7mm,
-  box/.style={draw, rounded corners=2pt, align=center, minimum height=9mm, text width=24mm, fill=white},
+  box/.style={draw, rounded corners=2pt, align=center, minimum height=13mm, text width=24mm, fill=white},
   data/.style={box, fill=blue!6, draw=blue!55!black},
   model/.style={box, fill=orange!8, draw=orange!70!black},
   trust/.style={box, fill=green!7, draw=green!55!black},
   decision/.style={box, fill=purple!7, draw=purple!60!black},
-  arr/.style={-{Latex[length=2mm]}, thick, draw=black!65}
+  gone/.style={densely dashed, draw=black!45, fill=black!8, text=black!65},
+  arr/.style={-{Latex[length=2mm]}, thick, draw=black!65},
+  faded/.style={arr, densely dashed, draw=black!35}
 ]
-\node[data] (data) {Climate / weather\\history $\mathbf{X}_t$};
-\node[model, right=of data] (temporal) {Temporal\\encoder $g_\theta$};
-\node[model, right=of temporal] (kan) {KAN functional\\representation};
+\node[data] (data) {Climate / weather\\history $\mathbf{X}_t$\\[1pt]\scriptsize $\robustHistory$ steps};
+\node[model, right=of data] (temporal) {Temporal\\encoder $g_\theta$\\[1pt]\scriptsize reads last $\robustFieldTrust$};
+\node[model, gone, right=of temporal] (kan) {KAN functional\\representation};
 \node[model, right=of kan] (embed) {Embedding\\$\mathbf e_t$};
 
 \node[model, above right=8mm and 9mm of embed] (point) {Point head\\$\hat{\mathbf y}_t$};
 \node[model, right=of embed] (quant) {Quantile head\\$\hat q^{(\tau)}$};
 \node[trust, right=of quant] (conf) {Static / rolling /\\adaptive conformal};
-\node[trust, below right=8mm and 9mm of embed] (shift) {Representation\\shift $d_t$};
+\node[trust, gone, below right=8mm and 9mm of embed] (shift) {Representation\\shift $d_t$};
 
 \node[trust, right=15mm of conf] (width) {Interval-width\\reliability};
-\node[trust, below=of width] (fusion) {Reliability fusion\\$r_t$};
-\node[decision, right=of fusion] (gate) {Selective gate\\accept / abstain};
+\node[trust, gone, below=of width] (fusion) {Reliability fusion\\$r_t$};
+\node[decision, gone, right=of fusion] (gate) {Selective gate\\accept / abstain};
 \node[decision, right=of gate] (eval) {Risk--coverage\\decision support};
 
 \draw[arr] (data) -- (temporal);
@@ -31,14 +44,22 @@
 \draw[arr] (embed) -- (quant);
 \draw[arr] (quant) -- (conf);
 \draw[arr] (conf) -- (width);
-\draw[arr] (embed) -- (shift);
+\draw[faded] (embed) -- (shift);
 \draw[arr] (width) -- (fusion);
-\draw[arr] (shift.east) -| (fusion.south);
+\draw[faded] (shift.east) -| (fusion.south);
 \draw[arr] (fusion) -- (gate);
 \draw[arr] (point.east) -| (gate.north);
 \draw[arr] (gate) -- (eval);
 
-\node[below=12mm of kan, align=center, text width=70mm] (interp) {\textbf{Interpretability analysis:} learned KAN edge functions, lag/feature effects, cross-seed and cross-regime functional stability};
-\draw[arr, dashed] (kan.south) -- (interp.north);
-\draw[arr, dashed] (interp.east) -| (fusion.south west);
+\node[below=14mm of kan, align=center, text width=76mm, draw=black!45, densely dashed,
+      rounded corners=2pt, fill=black!8, text=black!65, inner sep=4pt] (interp)
+  {\textbf{Interpretability analysis:} learned KAN edge functions over latent
+   channels; cross-seed and within-seed stability measured against controls};
+\draw[faded] (kan.south) -- (interp.north);
+
+\node[below=5mm of interp, align=center, text width=90mm] (legend)
+  {\tikz[baseline=-0.6ex]\node[draw=black!45, densely dashed, fill=black!8,
+     rounded corners=1pt, inner sep=2pt, minimum width=7mm, minimum height=3mm]{};\
+   withdrawn or refuted on its own pre-registered ablation;
+   solid components are those the evidence retains.};
 \end{tikzpicture}

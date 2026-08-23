@@ -10,20 +10,34 @@
 \usetikzlibrary{positioning,arrows.meta}
 \graphicspath{{figures/}}
 \newcommand{\method}{TrustKAN-Climate}
-\newcommand{\todo}[1]{\textcolor{red}{[TODO: #1]}}
+% A placeholder that reaches the PDF is a defect, so leave none that can. This
+% stops the build instead of printing a red note a reader might never see.
+\newcommand{\todo}[1]{%
+  \GenericError{}{Unresolved \string\todo: #1}{}{%
+    Resolve it or delete it; the manuscript may not ship a placeholder.}%
+}
 % Degrees Celsius without a siunitx dependency, so the manuscript builds on a
 % bare TeX installation like the artifacts it documents.
 \newcommand{\degC}{\ensuremath{^{\circ}}C}
 
-% Quantities quoted in prose, generated from the frozen ledgers by
-% scripts/make_paper_tables.py so that text and tables cannot drift apart.
-\IfFileExists{tables/cet_derived.tex}{\input{tables/cet_derived.tex}}{}
-\IfFileExists{tables/cet_adaptive.tex}{\input{tables/cet_adaptive.tex}}{}
-\IfFileExists{tables/cet_dataset.tex}{\input{tables/cet_dataset.tex}}{}
-\IfFileExists{tables/cet_rolling.tex}{\input{tables/cet_rolling.tex}}{}
-\IfFileExists{tables/cet_curves.tex}{\input{tables/cet_curves.tex}}{}
-\IfFileExists{tables/cet_defect.tex}{\input{tables/cet_defect.tex}}{}
-\IfFileExists{tables/cet_robustness_macros.tex}{\input{tables/cet_robustness_macros.tex}}{}
+% Quantities quoted in prose, generated from the frozen ledgers so that text and
+% tables cannot drift apart. A missing generated file must stop the build rather
+% than silently leave every macro it defines undefined, which on a case-sensitive
+% filesystem is the difference between a caught error and a wrong manuscript.
+\newcommand{\generated}[1]{%
+  \IfFileExists{#1}{\input{#1}}{%
+    \GenericError{}{Generated input #1 is missing; run the generators or
+      scripts/make_paper_bundle.py}{}{No numeric macro may be typed by hand,
+      so the build stops instead of proceeding without it.}%
+  }%
+}
+\generated{tables/cet_derived.tex}
+\generated{tables/cet_adaptive.tex}
+\generated{tables/cet_dataset.tex}
+\generated{tables/cet_rolling.tex}
+\generated{tables/cet_curves.tex}
+\generated{tables/cet_defect.tex}
+\generated{tables/cet_robustness_macros.tex}
 
 \title{A Trustworthy Forecasting Framework That Fails Its Own Tests: A Pre-Registered Evaluation of Reliability-Aware Kolmogorov--Arnold Networks for Climate Forecasting}
 

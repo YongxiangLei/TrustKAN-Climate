@@ -43,7 +43,10 @@ BUILD_SUFFIXES = frozenset(
     }
 )
 REFERENCE = re.compile(
-    r"\\(?:input|include|IfFileExists)\s*\{([^}]*)\}"
+    # \generated is the manuscript's own wrapper around \input that turns a
+    # missing generated table into a build error, so it pulls in files exactly
+    # as \input does and has to be followed the same way.
+    r"\\(?:input|include|IfFileExists|generated)\s*\{([^}]*)\}"
     r"|\\includegraphics\s*(?:\[[^\]]*\])?\s*\{([^}]*)\}"
     r"|\\bibliography\s*\{([^}]*)\}"
 )
@@ -69,7 +72,11 @@ def run(command: list[str], cwd: Path) -> subprocess.CompletedProcess:
 def generate(script: str, outdir: Path) -> None:
     """Regenerate the derived inputs, letting a stale-ledger failure through."""
     print(f"generating {script}", flush=True)
-    result = subprocess.run([sys.executable, str(SCRIPTS / script), "--outdir", str(outdir)], cwd=ROOT)
+    result = subprocess.run(
+        [sys.executable, str(SCRIPTS / script), "--outdir", str(outdir)],
+        cwd=ROOT,
+        env=dict(os.environ, PYTHONIOENCODING="utf-8"),
+    )
     if result.returncode:
         raise SystemExit(
             f"{script} exited {result.returncode}; the bundle would carry stale "
@@ -168,6 +175,12 @@ def check_portability(stage: Path) -> None:
         for tex_target, graphic, bibliography in REFERENCE.findall(text):
             targets = bibliography.split(",") if bibliography else [tex_target or graphic]
             for target in (name.strip() for name in targets):
+                # A macro parameter is not a filename. The \generated wrapper
+                # that makes a missing table fail loudly is itself written as
+                # \input{#1}, and resolving that would report every wrapper as
+                # a broken reference.
+                if re.fullmatch(r"#\d", target):
+                    continue
                 if "\\" in target or re.match(r"^(/|~|[A-Za-z]:)", target):
                     problems.append(f"{source} references a non-portable path: {target}")
                     continue
