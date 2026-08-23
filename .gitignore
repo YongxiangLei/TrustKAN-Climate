@@ -24,6 +24,7 @@ results/prepared/
 results/reliability/
 results/ablations/
 results/extremes/
+results/interpretability/
 results/robustness/
 results/splits/
 checkpoints/
@@ -38,6 +39,9 @@ paper/*.out
 paper/*.pdf
 paper/compile.log
 paper/bib.log
+
+# Overleaf bundle produced by scripts/make_paper_bundle.py; reproducible on demand.
+dist/
 *.pth
 *.pt
 .DS_Store

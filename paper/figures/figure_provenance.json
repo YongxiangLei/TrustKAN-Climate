@@ -1,0 +1,20 @@
+{
+  "code_sha256": "f1b287394e7f89b8e7daecd698d30a752095a441fde6c10b080824d20e98914e",
+  "coverage_window": 100,
+  "reliability_artifacts": "results/reliability/raw/cet_reliability_full",
+  "ablation_artifacts": "results/ablations/raw/ablations_cet_full",
+  "seeds": [
+    11,
+    22,
+    33,
+    44,
+    55
+  ],
+  "horizons": [
+    1,
+    7,
+    30,
+    90
+  ],
+  "rolling_coverage_definition": "per-origin lead times collapsed, then smoothed over origins"
+}
