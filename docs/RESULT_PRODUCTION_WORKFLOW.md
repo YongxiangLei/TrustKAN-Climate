@@ -61,11 +61,23 @@ is planned by `scripts/plan_jena_campaign.py` as described in
 
 ```bash
 python scripts/run_cet_benchmark.py --config configs/cet.yaml --resume
+python scripts/run_cet_benchmark.py --config configs/cet.yaml --collect-only
 python scripts/aggregate_results.py \
   --input results/aggregated/cet_full_runs.csv \
   --outdir results/tables/cet_full \
   --min-seeds 5
 ```
+
+The `--collect-only` pass is not optional, and it is the step most easily
+skipped. A sharded campaign runs with `--defer-collection` so that shards do not
+race to rewrite the ledger, which means the per-run records under
+`results/runs/<experiment>/` are complete while
+`results/aggregated/cet_full_runs.csv` still describes the campaign before them.
+Nothing downstream can detect this: the ledger is internally consistent, its
+rows carry the current fingerprint, and the generators emit tables from it
+without complaint — tables that quietly omit every model the last shards
+finished. Collect first, then confirm the ledger holds the row count the
+campaign planned before regenerating anything.
 
 Aggregation fails if a run key is duplicated, a successful row has no raw
 artifact, artifact metadata disagrees with the ledger, arrays have inconsistent
@@ -184,15 +196,42 @@ python scripts/audit_jena_campaign.py \
 
 ## 5. Generate paper artifacts
 
+Three generators produce every table, figure and numeric macro in the
+manuscript. Nothing in `paper/tables/` or `paper/figures/` is written by hand,
+including the numbers quoted in running prose, which arrive as macros from
+`tables/cet_prose.tex`.
+
 ```bash
-python scripts/generate_paper_artifacts.py \
-  --benchmark results/aggregated/all_runs.csv \
-  --drift-npz results/drift/<dataset>_h<horizon>_adaptive.npz \
-  --reliability-samples results/reliability/<dataset>_h<horizon>_reliability_error_samples.npz \
-  --reliability-bins results/reliability/<dataset>_h<horizon>_reliability_error_bins.csv
+python scripts/run_cet_extremes.py
+python scripts/make_paper_tables.py
+python scripts/make_paper_figures.py
+python scripts/analyze_robustness.py --outdir paper/tables
 ```
 
-Outputs are written to `paper/tables/` and `paper/figures/`.
+Run the extremes scorer first when the benchmark ledger has changed: it
+re-scores stored predictions onto the pre-registered extreme subsets, and its
+ledger must cover the same runs as the accuracy ledger or the two tables will
+describe different model sets.
+
+Each generator drops runs whose `code_sha256` differs from the live source tree,
+and aborts outright if a ledger contributes no current run at all, so a stale
+ledger produces an error rather than a plausible table. `make_paper_tables.py`
+records what it read in `paper/tables/cet_tables_provenance.json`, and
+`make_paper_figures.py` does the same in `paper/figures/figure_provenance.json`.
+
+Finally, package the manuscript. This regenerates everything a second time into
+a staging tree, refuses to copy in any generated file the generators did not
+just emit, compiles the result, and fails on an undefined macro, an unresolved
+reference or a missing input:
+
+```bash
+python scripts/make_paper_bundle.py
+```
+
+`tests/test_table_generator_gates.py` checks that the committed contents of
+`paper/tables/` are byte-identical to a fresh generation, so a generator change
+that is not followed by a regeneration fails the test suite rather than reaching
+the manuscript.
 
 ## Scientific safeguards
 

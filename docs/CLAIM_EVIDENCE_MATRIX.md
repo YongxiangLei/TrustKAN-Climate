@@ -4,9 +4,9 @@ This file prevents manuscript claims from outrunning experimental evidence.
 
 | Candidate claim | Required evidence | Status |
 |---|---|---|
-| TrustKAN improves deterministic climate forecasting | Multi-dataset, multi-horizon comparison against strong baselines; >=5 seeds | **Refuted on CET.** Across 4 horizons x 5 seeds it never leads; the transformer is best at every horizon and the gap widens with lead time (see below) |
+| TrustKAN improves deterministic climate forecasting | Multi-dataset, multi-horizon comparison against strong baselines; >=5 seeds | **Refuted on CET.** Across 4 horizons x 5 seeds it never leads; the transformer is best at every horizon, TrustKAN is the worst of the nine fitted models at h7/h30/h90, and the gap widens with lead time (see below) |
 | Temporal KAN component adds value beyond a plain KAN | Controlled KAN vs TrustKAN ablation under identical budgets | **Refuted on CET.** Origin-blocked paired bootstrap over 20 matched pairs: h1 inconclusive 5/5, and plain KAN significantly better 5/5 at h7, h30 and h90 (mean RMSE gap +0.15, +0.52, +1.40) |
-| TrustKAN provides calibrated uncertainty | Calibration/test separation; marginal and simultaneous coverage, width and interval score vs UQ baselines | **Partially supported, but not a contribution.** Marginal coverage lands on nominal (0.894/0.889/0.901/0.904) — this is the split-conformal guarantee and holds for any backbone. Simultaneous bands under-cover (0.870/0.850/0.862 at h7/h30/h90) and per-origin joint coverage collapses (0.609/0.256/0.103) |
+| TrustKAN provides calibrated uncertainty | Calibration/test separation; marginal and simultaneous coverage, width and interval score vs UQ baselines | **Partially supported, but not a contribution.** Marginal coverage lands on nominal (0.894/0.889/0.901/0.904) — this is the split-conformal guarantee and holds for any backbone. Simultaneous bands under-cover (0.870/0.850/0.862 at h7/h30/h90) and per-origin joint coverage collapses (0.609/0.256/0.102) |
 | Adaptive calibration is robust to temporal shift | Rolling coverage and shift experiments vs static conformal | **Supported on CET.** A8 cuts rolling coverage deviation against static split conformal by 13.7%, 14.9%, 21.1% and 32.9% at h1/h7/h30/h90 for a width cost of only 2.5-4.6%, and the gain grows with lead time |
 | KAN component is necessary at all | Budget-matched replacement of the KAN mapping by an MLP (A1) | **Refuted on CET.** A1 differs from the full model by at most 0.008 degC, inside the across-seed spread, at every horizon |
 | KAN explanations are stable | Across-seed and perturbation stability metrics, not only visual examples | **Refuted on CET.** Index-matched curve correlation is +0.001/+0.001/+0.001/+0.000 at h1/h7/h30/h90, i.e. chance. Both charitable readings fail their controls: matched \|r\| is 0.780 against a shuffled-pair control of 0.780, and best-match 0.996 against a within-seed control of 0.996 |
@@ -22,26 +22,38 @@ Do not mark a row Supported until raw experiment outputs, configuration, seeds a
 
 ## CET accuracy outcome, 2026-08
 
-The first complete CET campaign refutes the accuracy claims. Test RMSE, mean of
-five seeds, current code fingerprint `6426a567`:
+The complete CET campaign refutes the accuracy claims. All 168 runs (10 models x
+4 horizons, 5 seeds for the stochastic models and 1 for persistence and SVR) are
+now collected. Test RMSE, mean over seeds, current code fingerprint `6426a567`:
 
 | model | h1 | h7 | h30 | h90 |
 |---|---|---|---|---|
 | transformer | 1.989 | 2.679 | 2.908 | 2.960 |
 | gru | 2.011 | 2.713 | 2.991 | 3.141 |
 | lstm | 2.016 | 2.722 | 3.022 | 3.183 |
+| tcn | 2.023 | 2.846 | 3.352 | 4.017 |
+| random_forest | 2.026 | 2.759 | 3.000 | 3.049 |
 | kan (plain) | 2.075 | 2.822 | 3.000 | 3.026 |
 | mlp | 2.121 | 2.827 | 2.967 | 3.019 |
+| svr | 2.176 | 2.937 | 3.151 | 3.224 |
 | trustkan | 2.057 | 2.969 | 3.524 | 4.429 |
 | persistence | 2.144 | 3.316 | 4.037 | 5.458 |
 
-TrustKAN is mid-pack at one day and degrades faster than every learned baseline
-as the lead time grows, ending worst of them at 90 days. Its 90-day error
-(4.429) exceeds what persistence achieves at 30 days (4.037), though it stays
-ahead of persistence at a matched horizon. These numbers already reflect the
-corrected last-state readout; the A9 reproduction of the mean-pooled readout
-falls behind persistence at 3 of the 4 horizons, by up to 1.80 degC, and edges
-ahead only at h90 where persistence itself collapses.
+TrustKAN is mid-pack at one day (6th of 10) and degrades faster than every
+learned baseline as the lead time grows, ending worst of the nine fitted models
+at h7, h30 and h90. Its 90-day error (4.429) exceeds what persistence achieves at
+30 days (4.037), though it stays ahead of persistence at a matched horizon. These
+numbers already reflect the corrected last-state readout; the A9 reproduction of
+the mean-pooled readout falls behind persistence at 3 of the 4 horizons, by up to
+1.80 degC, and edges ahead only at h90 where persistence itself collapses.
+
+The classical shards, which finished last and were the final cells to land,
+strengthen the refutation rather than weakening it: random forest (3.000, 3.049)
+and SVR (3.151, 3.224) are both more accurate than TrustKAN at h30 and h90. The
+best-model bolding does not move — the transformer remains best at all four
+horizons — so no prior conclusion is revised, but the proposed model is now
+behind the cheapest fitted baselines in the benchmark and not only behind the
+strongest neural ones.
 
 The architecture therefore cannot be presented as an accuracy contribution on
 this dataset. Any surviving accuracy statement must be scoped to one-day
@@ -57,7 +69,7 @@ also fail to support the trust claims.
 | 1 | 0.894 | 0.894 | 0.894 | 2.024 | **2.012** | 2.025 | 0.516 |
 | 7 | 0.889 | 0.609 | 0.870 | 2.932 | **2.760** | 3.035 | 0.492 |
 | 30 | 0.901 | 0.256 | 0.850 | 3.470 | **3.190** | 3.643 | 0.503 |
-| 90 | 0.904 | 0.103 | 0.862 | 4.314 | **3.989** | 4.551 | 0.540 |
+| 90 | 0.904 | 0.102 | 0.862 | 4.314 | **3.989** | 4.551 | 0.540 |
 
 Three things stand out. Marginal coverage is on target, but split conformal
 guarantees that by construction for any backbone, so it evidences the wrapper
@@ -103,14 +115,23 @@ Union of cold and warm origins, mean over five seeds, test RMSE in degC:
 |---|---|---|---|---|
 | transformer | 2.450 | 2.761 | 2.725 | 2.839 |
 | kan (plain) | 2.560 | 2.943 | 2.765 | 2.853 |
+| random_forest | 2.507 | 2.795 | 2.787 | 2.866 |
+| gru | 2.542 | 2.835 | 2.871 | 2.902 |
+| mlp | 2.633 | 2.978 | 2.799 | 2.908 |
+| lstm | 2.507 | 2.831 | 2.849 | 2.971 |
+| svr | 2.921 | 2.942 | 2.863 | 3.046 |
+| tcn | 2.476 | 2.856 | 2.955 | 3.375 |
 | trustkan | 2.547 | 2.953 | 3.001 | 3.587 |
+| persistence | 2.270 | 3.644 | 4.540 | 6.620 |
 
-Two cautions for anyone reusing this table. The union is dominated by warm
+Three cautions for anyone reusing this table. The union is dominated by warm
 origins (246 against about 55 cold), so it largely measures warm extremes; cold
-origins are about a degree harder for every model. And at h30/h90 most models
-score *better* on the extreme subset than on its complement, because warm
-extremes here fall in summer when English temperature variance is lowest. Only
-the between-model comparison on a fixed subset is meaningful.
+origins are about a degree harder for every model than ordinary days. At h30/h90
+most models score *better* on the extreme subset than on its complement, because
+warm extremes here fall in summer when English temperature variance is lowest.
+And persistence holds the best h1 entry for the same reason — the subset selects
+the calmest days of the year — while remaining worst at every other horizon.
+Only the between-model comparison on a fixed subset is meaningful.
 
 Notably, TrustKAN's h90 extreme-subset error (3.587) is well below its
 complement error (4.512), so its degradation is concentrated on ordinary days
@@ -152,7 +173,7 @@ a protocol — so the binding was audited rather than assumed.
 
 | check | benchmark | robustness | KAN curves | receptive field |
 |---|---|---|---|---|
-| records | 162 ok | 60 ok | 20 ok | 12 ok |
+| records | 168 ok | 60 ok | 20 ok | 12 ok |
 | `config_sha256` | `ebd6ad64e219` | same | same | same |
 | `dataset_sha256` | `c54a9da8a66e` | same | same | same |
 | device / torch | `cuda:0`, `2.13.0+cu126` | same | same | same |
