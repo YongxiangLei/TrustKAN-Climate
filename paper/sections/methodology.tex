@@ -63,15 +63,16 @@ Let $[\hat{\ell}_{i,h},\hat{u}_{i,h}]$ denote the lower and upper model quantile
 \begin{equation}
 s_{i,h}=\max\{\hat{\ell}_{i,h}-y_{i,h},\; y_{i,h}-\hat{u}_{i,h},\;0\}.
 \end{equation}
-The calibration scores are flattened over samples and horizons in the current implementation. With $n$ scores and target miscoverage $\alpha$, the finite-sample expansion radius is
+Two calibrations are computed from these scores, because they target different estimands and the results section reports both. The first treats each lead separately, using the $n$ calibration origins as its sample, and gives a radius per lead,
 \begin{equation}
-\hat{q}_{1-\alpha}=Q_{\lceil(n+1)(1-\alpha)\rceil/n}\left(\{s_j\}_{j=1}^{n}\right),
+\hat{q}^{(h)}_{1-\alpha}=Q_{\lceil(n+1)(1-\alpha)\rceil/n}\left(\{s_{i,h}\}_{i=1}^{n}\right),
+\label{eq:marginalradius}
 \end{equation}
-where $Q$ denotes the empirical quantile using the higher order statistic. The calibrated interval is
+where $Q$ denotes the empirical quantile using the higher order statistic. This targets marginal coverage at each lead. The second takes each origin's worst lead, $s_i=\max_h s_{i,h}$, and calibrates a single radius $\hat{q}^{\mathrm{sim}}_{1-\alpha}$ on those $n$ values, which targets simultaneous coverage of a whole forecast trajectory. The calibrated intervals are
 \begin{equation}
-\mathcal{C}_{t,h}=[\hat{\ell}_{t,h}-\hat{q}_{1-\alpha},\;\hat{u}_{t,h}+\hat{q}_{1-\alpha}].
+\mathcal{C}_{t,h}=[\hat{\ell}_{t,h}-\hat{q}_{1-\alpha},\;\hat{u}_{t,h}+\hat{q}_{1-\alpha}],
 \end{equation}
-Static conformal calibration is treated as a baseline rather than assumed to remain valid under arbitrary temporal shift.
+with $\hat{q}_{1-\alpha}$ taken from \eqref{eq:marginalradius} for the marginal construction and equal to $\hat{q}^{\mathrm{sim}}_{1-\alpha}$ for the simultaneous one. Section~\ref{sec:results_calibration} shows why both are needed: the marginal construction holds its nominal level while the joint coverage it implies does not. Static conformal calibration is treated as a baseline rather than assumed to remain valid under arbitrary temporal shift.
 
 \subsection{Rolling and Adaptive Conformal Calibration}
 To respond to non-stationarity, we additionally evaluate sequential calibration. In rolling conformal prediction, the conformal radius at time $t$ is computed from only the most recent $W$ revealed nonconformity scores. The current target is inserted into the score buffer only after the interval for that time step has been issued, preventing label look-ahead.
@@ -89,20 +90,20 @@ we update
 where $\gamma$ is the adaptation rate and $\Pi$ clips the value to a valid range. This creates wider intervals after repeated misses and narrower intervals when empirical errors are below target. Static, rolling, and adaptive variants are compared using coverage, width, interval score, and rolling coverage deviation.
 
 \subsection{Representation-Shift Evidence}
-Let $\boldsymbol{\mu}$ and $\boldsymbol{\Sigma}$ denote the mean and regularized covariance of calibration embeddings. For a new embedding $\mathbf{e}_t$, the representation-shift score is
+Let $\boldsymbol{\mu}$ and $\boldsymbol{\Sigma}$ denote the mean and regularized covariance of a bounded subset of \emph{training} embeddings, which is the reference the score measures departure from. For a new embedding $\mathbf{e}_t$, the representation-shift score is
 \begin{equation}
 d_t=\sqrt{(\mathbf{e}_t-\boldsymbol{\mu})^\top\boldsymbol{\Sigma}^{-1}(\mathbf{e}_t-\boldsymbol{\mu})}.
 \label{eq:mahal}
 \end{equation}
-Rather than interpreting $d_t$ as calibrated probability, it is converted into an empirical reliability component by ranking it relative to calibration scores. Lower shift implies higher reliability.
+Rather than interpreting $d_t$ as calibrated probability, it is converted into an empirical reliability component by ranking it relative to the shift scores of the calibration partition, so the reference distribution and the ranking distribution are deliberately distinct. Lower shift implies higher reliability.
 
 \subsection{Reliability Fusion}
-The framework uses two default evidence components: an interval-width score and an embedding-shift score. Let $w_t$ denote mean conformal interval width for sample $t$. A width-based reliability score is obtained by mapping $w_t$ relative to the calibration-width distribution, while the representation component is derived from Eq.~\eqref{eq:mahal}. The fused reliability is
+The framework uses two default evidence components: an interval-width score and an embedding-shift score. Let $w_t$ denote mean conformal interval width for sample $t$. A width-based reliability score is obtained by mapping $w_t$ relative to the calibration-width distribution, while the representation component is derived from Eq.~\eqref{eq:mahal}. The fused reliability is their weighted geometric mean,
 \begin{equation}
-r_t=\omega r_{t}^{\mathrm{width}}+(1-\omega)r_{t}^{\mathrm{shift}},\qquad 0\leq\omega\leq1.
+r_t=\left(r_{t}^{\mathrm{width}}\right)^{\omega}\left(r_{t}^{\mathrm{shift}}\right)^{1-\omega},\qquad 0\leq\omega\leq1,
 \label{eq:fusion}
 \end{equation}
-The fusion weight and decision threshold are selected on calibration data only. Importantly, Eq.~\eqref{eq:fusion} is treated as a testable design choice: ablation experiments must show that fusion adds value beyond either component alone.
+which was chosen over an arithmetic combination so that a low value in either component pulls the fused score down rather than being averaged away. The weight was frozen at $\omega=1/2$ in advance rather than fitted; Section~\ref{sec:discussion} argues that freezing an arbitrary constant is weaker discipline than freezing a validation-based procedure for choosing it, and that this particular choice is what makes the fusion worse than its own best input. The decision threshold, by contrast, is selected on calibration data. Importantly, Eq.~\eqref{eq:fusion} is treated as a testable design choice: ablation experiments must show that fusion adds value beyond either component alone.
 
 \subsection{Reliability--Error Validation}
 A reliability score is useful only if it is informative about realized error. For each sample, define an aggregate forecast error
