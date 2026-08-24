@@ -11,7 +11,15 @@ from __future__ import annotations
 
 import pytest
 
-from scripts.make_paper_bundle import GENERATED_MARKER, PAPER, TREES, collect, is_generated
+from scripts.make_paper_bundle import (
+    GENERATED_MARKER,
+    PAPER,
+    TREES,
+    WRAP_WIDTH,
+    collect,
+    inspect_log,
+    is_generated,
+)
 
 GENERATORS = ("make_paper_tables.py", "make_paper_figures.py", "analyze_robustness.py")
 
@@ -70,3 +78,51 @@ def test_collect_accepts_generated_files_the_generators_did_emit(tmp_path):
 def test_the_trees_the_bundle_walks_still_exist():
     for tree in TREES:
         assert (PAPER / tree).is_dir()
+
+
+CLEAN_LOG = "This is pdfTeX\nOutput written on main.pdf (16 pages, 566393 bytes).\n"
+
+
+def log(tmp_path, text: str):
+    path = tmp_path / "main.log"
+    path.write_text(text, encoding="utf-8")
+    return path
+
+
+def test_a_clean_log_reports_its_page_count(tmp_path):
+    assert inspect_log(log(tmp_path, CLEAN_LOG)) == 16
+
+
+def test_an_undefined_macro_fails_the_verification_build(tmp_path):
+    """An undefined macro typesets nothing and would drop a number in silence.
+
+    The \\generated wrapper stops a missing table file, but a table that exists
+    while its macros do not is the same defect one layer down, and this is the
+    only thing standing between that and a published blank.
+    """
+    text = CLEAN_LOG + "! Undefined control sequence.\nl.42 \\robustControlTrust\n"
+    with pytest.raises(SystemExit, match="Undefined control sequence"):
+        inspect_log(log(tmp_path, text))
+
+
+def test_unresolved_references_and_citations_fail_the_build(tmp_path):
+    for warning in (
+        "LaTeX Warning: Reference `tab:absent' on page 3 undefined on input line 9.",
+        "LaTeX Warning: Citation `nobody2020' on page 3 undefined on input line 9.",
+    ):
+        with pytest.raises(SystemExit, match="not clean"):
+            inspect_log(log(tmp_path, CLEAN_LOG + warning + "\n"))
+
+
+def test_a_problem_wrapped_across_lines_is_still_seen(tmp_path):
+    """TeX wraps its log at a fixed width, splitting the very lines checked."""
+    prefix = "! Undefined control sequence"
+    padding = "x" * (WRAP_WIDTH - len(prefix))
+    text = CLEAN_LOG + f"{prefix}{padding}\n and the rest of the message\n"
+    with pytest.raises(SystemExit, match="Undefined control sequence"):
+        inspect_log(log(tmp_path, text))
+
+
+def test_a_log_without_output_is_not_read_as_a_successful_build(tmp_path):
+    with pytest.raises(SystemExit, match="no output file"):
+        inspect_log(log(tmp_path, "This is pdfTeX\n"))
