@@ -125,7 +125,15 @@ def robustness_table(grid: pd.DataFrame, fields: pd.DataFrame, out: Path) -> Non
     ]
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    print(f"  wrote {out.relative_to(ROOT)}")
+    print(f"  wrote {log_path(out)}")
+
+
+def log_path(path: Path) -> str:
+    """Path for logging, which must never be able to abort a write."""
+    try:
+        return str(path.resolve().relative_to(ROOT))
+    except ValueError:
+        return str(path)
 
 
 def block_saturation(grid: pd.DataFrame) -> pd.Series:
@@ -177,7 +185,7 @@ def macros(grid: pd.DataFrame, fields: pd.DataFrame, out: Path) -> None:
     macro("robustLevels", f"{corrupted.groupby(['kind', 'level']).ngroups}")
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    print(f"  wrote {out.relative_to(ROOT)}")
+    print(f"  wrote {log_path(out)}")
 
 
 def pct(frame: pd.DataFrame) -> str:
@@ -185,6 +193,10 @@ def pct(frame: pd.DataFrame) -> str:
 
 
 def main(outdir: Path) -> None:
+    # A relative --outdir, which is how docs/RESULT_PRODUCTION_WORKFLOW.md
+    # invokes this script, used to abort between the two output files and leave
+    # the table regenerated and its macros stale.
+    outdir = Path(outdir).resolve()
     print("receptive fields")
     fields = receptive_fields()
     if not GRID.exists():
