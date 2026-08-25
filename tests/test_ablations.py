@@ -47,7 +47,7 @@ def test_unknown_encoder_is_rejected():
 
 def test_unknown_readout_is_rejected():
     with pytest.raises(ValueError, match="readout must be one of"):
-        TrustKAN(1, horizon=1, readout="attention")
+        TrustKAN(1, horizon=1, readout="median")
 
 
 def test_default_readout_preserves_recency():
