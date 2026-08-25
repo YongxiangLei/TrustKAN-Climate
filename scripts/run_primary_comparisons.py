@@ -37,10 +37,28 @@ FAMILY = (
     ("trustkan", "kan", "temporal KAN module beyond a plain KAN"),
     ("trustkan", "transformer", "accuracy against the strongest neural baseline"),
 )
+# Second study, declared before its comparisons were run. It is a separate
+# family set rather than an extension of the one above: appending pairs to a
+# family that has already been read would inflate the multiplicity the Holm
+# correction is there to control. Each family is corrected within itself.
+V2_FAMILY = (
+    ("trustkan_v2", "transformer", "accuracy against the strongest neural baseline"),
+    ("trustkan_v2", "kan", "temporal representation beyond a plain KAN"),
+    ("trustkan_v2", "trustkan_dilated", "global attention readout beyond a wide stem"),
+    ("trustkan_v2", "trustkan", "the corrected architecture against the published one"),
+)
+FAMILY_SETS = {"primary": FAMILY, "v2": V2_FAMILY}
+# Variants trained by the stem pilots rather than by the frozen campaign. The
+# protocol is identical, so pairs remain matched on origin and seed, but the
+# artifacts live under their own experiment names.
+PILOT_RAW = {
+    "trustkan_v2": ROOT / "results" / "raw" / "cet_stem_pilot_v2",
+    "trustkan_dilated": ROOT / "results" / "raw" / "cet_stem_pilot",
+}
 
 
 def artifact(model: str, horizon: int, seed: int) -> Path:
-    return RAW / f"cet_{model}_h{horizon}_s{seed}.npz"
+    return PILOT_RAW.get(model, RAW) / f"cet_{model}_h{horizon}_s{seed}.npz"
 
 
 def atomic_json(path: Path, payload) -> None:
@@ -118,10 +136,10 @@ def compare_pair(a_model, b_model, horizon, seed, n_boot, confidence):
     return result, str(a["code_sha256"].item())
 
 
-def main(outdir: Path, n_boot: int, confidence: float) -> None:
+def main(outdir: Path, n_boot: int, confidence: float, families=FAMILY) -> None:
     alpha = 1 - confidence
     index = []
-    for a_model, b_model, isolates in FAMILY:
+    for a_model, b_model, isolates in families:
         print(f"\n{a_model} vs {b_model}: {isolates}")
         # The family spans every horizon and seed for this comparator, so Holm
         # is applied once across all of them rather than per horizon.
@@ -224,5 +242,11 @@ if __name__ == "__main__":
     )
     parser.add_argument("--n-boot", type=int, default=5000)
     parser.add_argument("--confidence", type=float, default=0.95)
+    parser.add_argument("--family", choices=sorted(FAMILY_SETS), default="primary")
     args = parser.parse_args()
-    main(Path(args.outdir), args.n_boot, args.confidence)
+    main(
+        Path(args.outdir),
+        args.n_boot,
+        args.confidence,
+        families=FAMILY_SETS[args.family],
+    )
