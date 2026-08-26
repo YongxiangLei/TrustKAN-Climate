@@ -14,6 +14,7 @@ import argparse
 import hashlib
 import json
 import os
+from dataclasses import dataclass
 from pathlib import Path
 
 import pandas as pd
@@ -21,13 +22,57 @@ import pandas as pd
 import _bootstrap  # noqa: F401  # repository-root import setup
 
 ROOT = Path(__file__).resolve().parents[1]
-BENCHMARK_LEDGER = ROOT / "results" / "aggregated" / "cet_full_runs.csv"
-RELIABILITY_LEDGER = (
-    ROOT / "results" / "reliability" / "aggregated" / "cet_reliability_full_runs.csv"
-)
-COMPARISON_INDEX = (
-    ROOT / "results" / "statistical_tests" / "cet_primary" / "primary_comparisons_index.json"
-)
+
+
+@dataclass(frozen=True)
+class Study:
+    """Where one study's ledgers live and which model it is arguing about.
+
+    The v2 architecture had to be evaluated without disturbing the published
+    artifacts, so each study writes to its own experiment names. Collecting the
+    paths here keeps the generator from being rewritten per study and keeps the
+    two sets of tables from ever being mixed.
+    """
+
+    benchmark: Path
+    reliability: Path
+    comparisons: Path
+    ablations: Path
+    ablation_runs: Path
+    extremes: Path
+    proposed: str
+
+
+STUDIES = {
+    "v1": Study(
+        benchmark=ROOT / "results" / "aggregated" / "cet_full_runs.csv",
+        reliability=ROOT / "results" / "reliability" / "aggregated"
+        / "cet_reliability_full_runs.csv",
+        comparisons=ROOT / "results" / "statistical_tests" / "cet_primary"
+        / "primary_comparisons_index.json",
+        ablations=ROOT / "results" / "ablations" / "aggregated"
+        / "ablations_cet_full_runs.csv",
+        ablation_runs=ROOT / "results" / "ablations" / "runs" / "ablations_cet_full",
+        extremes=ROOT / "results" / "extremes" / "cet_extremes_runs.csv",
+        proposed="trustkan",
+    ),
+    "v2": Study(
+        benchmark=ROOT / "results" / "aggregated" / "cet_v2_neural_runs.csv",
+        reliability=ROOT / "results" / "reliability" / "aggregated"
+        / "cet_reliability_v2_runs.csv",
+        comparisons=ROOT / "results" / "statistical_tests" / "cet_v2"
+        / "primary_comparisons_index.json",
+        ablations=ROOT / "results" / "ablations" / "aggregated"
+        / "ablations_cet_v2_runs.csv",
+        ablation_runs=ROOT / "results" / "ablations" / "runs" / "ablations_cet_v2",
+        extremes=ROOT / "results" / "extremes" / "cet_v2_extremes_runs.csv",
+        proposed="trustkan_v2",
+    ),
+}
+# Set once by main. Module-level so the table builders do not each have to
+# thread the study through, and frozen per invocation so they cannot disagree
+# about which ledgers they are reading.
+STUDY = STUDIES["v1"]
 HORIZONS = (1, 7, 30, 90)
 MODEL_LABELS = {
     "persistence": "Persistence",
@@ -39,7 +84,9 @@ MODEL_LABELS = {
     "tcn": "TCN",
     "transformer": "Transformer",
     "kan": "KAN (plain)",
-    "trustkan": "TrustKAN (ours)",
+    "trustkan": "TrustKAN (published)",
+    "trustkan_dilated": "TrustKAN, wide stem",
+    "trustkan_v2": "TrustKAN v2 (ours)",
 }
 MODEL_ORDER = list(MODEL_LABELS)
 # Fitted but not neural. Persistence is excluded: it is trivial rather than
@@ -272,15 +319,13 @@ def comparison_table(index_path: Path, out: Path) -> None:
     write(out, lines)
 
 
-ABLATION_LEDGER = (
-    ROOT / "results" / "ablations" / "aggregated" / "ablations_cet_full_runs.csv"
-)
-ABLATION_RUNS = ROOT / "results" / "ablations" / "runs" / "ablations_cet_full"
 TRAINED_ABLATIONS = {
     "A0": "Full TrustKAN",
     "A1": "KAN encoder $\\to$ budget-matched MLP",
     "A2": "No quantile head",
     "A9": "Mean-pooled readout (superseded)",
+    "A10": "Local stem, field spans three steps",
+    "A11": "Last-state readout, no global aggregation",
 }
 
 
@@ -325,7 +370,7 @@ def evaluation_ablation_table(out: Path):
     draws on the same aggregation as the table rather than a second one.
     """
     rows, adaptive = [], []
-    for path in sorted(ABLATION_RUNS.glob("ablation_A0_h*_s*.json")):
+    for path in sorted(STUDY.ablation_runs.glob("ablation_A0_h*_s*.json")):
         record = json.loads(path.read_text(encoding="utf-8"))
         if record.get("status") != "ok":
             continue
@@ -601,15 +646,15 @@ def provenance(bench: pd.DataFrame, rel: pd.DataFrame, out: Path) -> None:
     """Record which artifacts produced the tables so reviewers can re-derive them."""
     payload = {
         "benchmark": {
-            "ledger": str(BENCHMARK_LEDGER.relative_to(ROOT).as_posix()),
-            "ledger_sha256": hashlib.sha256(BENCHMARK_LEDGER.read_bytes()).hexdigest(),
+            "ledger": str(STUDY.benchmark.relative_to(ROOT).as_posix()),
+            "ledger_sha256": hashlib.sha256(STUDY.benchmark.read_bytes()).hexdigest(),
             "runs": int(len(bench)),
             "code_sha256": str(bench.code_sha256.iloc[0]),
             "dataset_sha256": str(bench.dataset_sha256.iloc[0]),
         },
         "reliability": {
-            "ledger": str(RELIABILITY_LEDGER.relative_to(ROOT).as_posix()),
-            "ledger_sha256": hashlib.sha256(RELIABILITY_LEDGER.read_bytes()).hexdigest(),
+            "ledger": str(STUDY.reliability.relative_to(ROOT).as_posix()),
+            "ledger_sha256": hashlib.sha256(STUDY.reliability.read_bytes()).hexdigest(),
             "runs": int(len(rel)),
             "code_sha256": str(rel.code_sha256.iloc[0]),
             "nominal_coverage": float(rel.nominal_coverage.iloc[0]),
@@ -710,7 +755,7 @@ def prose_macros(bench, rel, abl, eval_stats, ext, out: Path) -> None:
     # Whether the accuracy deficit is larger than the noise that produced it.
     macro(
         "benchSeedSdTrust",
-        f"{bench[bench.model.eq('trustkan')].groupby('horizon').rmse.std().max():.3f}",
+        f"{bench[bench.model.eq(STUDY.proposed)].groupby('horizon').rmse.std().max():.3f}",
     )
 
     # Which classical baselines finish ahead of the proposed model at the long
@@ -724,7 +769,7 @@ def prose_macros(bench, rel, abl, eval_stats, ext, out: Path) -> None:
         MODEL_LABELS.get(model, model)
         for model in CLASSICAL_MODELS
         if model in rmse.index
-        and all(rmse.loc[model, h] < rmse.loc["trustkan", h] for h in long_horizons)
+        and all(rmse.loc[model, h] < rmse.loc[STUDY.proposed, h] for h in long_horizons)
     ]
     if ahead and long_horizons:
         macro("classicalAheadLong", oxford(sorted(ahead)))
@@ -773,8 +818,8 @@ def prose_macros(bench, rel, abl, eval_stats, ext, out: Path) -> None:
         macro("abstainGainLow", f"{eval_stats.A7.min():.3f}")
         macro("abstainGainHigh", f"{eval_stats.A7.max():.3f}")
 
-    if COMPARISON_INDEX.exists():
-        rows = json.loads(COMPARISON_INDEX.read_text(encoding="utf-8"))
+    if STUDY.comparisons.exists():
+        rows = json.loads(STUDY.comparisons.read_text(encoding="utf-8"))
         # The text speaks of the comparator's advantage as a penalty, so the
         # magnitude is what it needs; the sign is carried by Table 2.
         gaps = {
@@ -786,18 +831,42 @@ def prose_macros(bench, rel, abl, eval_stats, ext, out: Path) -> None:
                 if (model, horizon) in gaps:
                     macro(f"paired{key}{word}", f"{gaps[(model, horizon)]:.3f}")
 
+        # The verdict itself is generated, not narrated. Writing "wins" or
+        # "indistinguishable" by hand would let the prose survive a change of
+        # evidence, which is exactly what these comparisons exist to prevent.
+        for comparator, key in (("transformer", "Transformer"), ("kan", "Kan")):
+            family = [r for r in rows if str(r["model_b"]) == comparator]
+            if not family:
+                continue
+            wins = sum(int(r["a_better"]) for r in family)
+            losses = sum(int(r["b_better"]) for r in family)
+            total = sum(int(r["n_pairs"]) for r in family)
+            macro(f"paired{key}Wins", str(wins))
+            macro(f"paired{key}Losses", str(losses))
+            macro(f"paired{key}Total", str(total))
+            if wins == 0 and losses == 0:
+                verdict = "statistically indistinguishable from"
+            elif wins > 0 and losses == 0:
+                verdict = "better than" if wins == total else "better than or level with"
+            elif losses > 0 and wins == 0:
+                verdict = "worse than" if losses == total else "level with or worse than"
+            else:
+                verdict = "mixed against"
+            macro(f"paired{key}Verdict", verdict)
+
     if ext is not None:
         either = ext.groupby(["model", "horizon"]).either_rmse.mean()
         complement = ext.groupby(["model", "horizon"]).complement_rmse.mean()
         counts = ext.groupby("horizon")[["cold_n_origins", "warm_n_origins"]].first()
         last = max(names)
-        if ("trustkan", last) in either.index and ("transformer", last) in either.index:
+        proposed = STUDY.proposed
+        if (proposed, last) in either.index and ("transformer", last) in either.index:
             macro(
                 "extremeGapNinety",
-                f"{either[('trustkan', last)] - either[('transformer', last)]:.3f}",
+                f"{either[(proposed, last)] - either[('transformer', last)]:.3f}",
             )
-            macro("extremeTrustNinety", f"{either[('trustkan', last)]:.3f}")
-            macro("extremeComplementNinety", f"{complement[('trustkan', last)]:.3f}")
+            macro("extremeTrustNinety", f"{either[(proposed, last)]:.3f}")
+            macro("extremeComplementNinety", f"{complement[(proposed, last)]:.3f}")
         warm = counts.warm_n_origins.unique()
         macro("extremeWarmCount", f"{int(warm[0])}" if len(warm) == 1 else "varying")
         macro("extremeColdLow", f"{int(counts.cold_n_origins.min())}")
@@ -806,14 +875,18 @@ def prose_macros(bench, rel, abl, eval_stats, ext, out: Path) -> None:
     write(out, lines)
 
 
-def main(outdir: Path) -> None:
+def main(outdir: Path, study: str = "v1") -> None:
+    global STUDY
+    STUDY = STUDIES[study]
+
     from run_cet_benchmark import code_sha256 as benchmark_fingerprint
     from run_cet_reliability import code_sha256 as reliability_fingerprint
 
+    print(f"study {study}: proposed model {STUDY.proposed}")
     print("benchmark ledger")
-    bench = load_ok(BENCHMARK_LEDGER, benchmark_fingerprint())
+    bench = load_ok(STUDY.benchmark, benchmark_fingerprint())
     print("reliability ledger")
-    rel = load_ok(RELIABILITY_LEDGER, reliability_fingerprint())
+    rel = load_ok(STUDY.reliability, reliability_fingerprint())
     benchmark_table(bench, outdir / "cet_rmse.tex")
     reliability_table(rel, outdir / "cet_calibration.tex")
     selective_table(rel, outdir / "cet_selective.tex")
@@ -821,28 +894,28 @@ def main(outdir: Path) -> None:
     derived_quantities(rel, outdir / "cet_derived.tex")
     dataset_macros(rel, outdir / "cet_dataset.tex")
     ext = None
-    if EXTREMES_LEDGER.exists():
+    if STUDY.extremes.exists():
         # The extreme subsets re-score the benchmark's stored predictions, so
         # the fingerprint they must match is the benchmark's. Without this the
         # extremes table was the one table that could carry superseded runs.
         print("extremes ledger")
-        ext = load_ok(EXTREMES_LEDGER, benchmark_fingerprint(), has_status=False)
+        ext = load_ok(STUDY.extremes, benchmark_fingerprint(), has_status=False)
         extremes_table(ext, outdir / "cet_extremes.tex")
     else:
         print("  skipping extremes table; run scripts/run_cet_extremes.py first")
     abl, eval_stats = None, None
-    if ABLATION_LEDGER.exists():
+    if STUDY.ablations.exists():
         from run_ablations import code_sha256 as ablation_fingerprint
 
         print("ablation ledger")
-        abl = load_ok(ABLATION_LEDGER, ablation_fingerprint())
+        abl = load_ok(STUDY.ablations, ablation_fingerprint())
         trained_ablation_table(abl, outdir / "cet_ablation.tex")
         defect_macros(bench, abl, outdir / "cet_defect.tex")
         eval_stats = evaluation_ablation_table(outdir / "cet_eval_ablation.tex")
     else:
         print("  skipping ablation tables; run scripts/run_ablations.py first")
-    if COMPARISON_INDEX.exists():
-        comparison_table(COMPARISON_INDEX, outdir / "cet_paired.tex")
+    if STUDY.comparisons.exists():
+        comparison_table(STUDY.comparisons, outdir / "cet_paired.tex")
     else:
         print("  skipping paired table; run scripts/run_primary_comparisons.py first")
     prose_macros(bench, rel, abl, eval_stats, ext, outdir / "cet_prose.tex")
@@ -853,5 +926,6 @@ def main(outdir: Path) -> None:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--outdir", default=str(ROOT / "paper" / "tables"))
+    parser.add_argument("--study", choices=sorted(STUDIES), default="v1")
     args = parser.parse_args()
-    main(Path(args.outdir))
+    main(Path(args.outdir), args.study)
