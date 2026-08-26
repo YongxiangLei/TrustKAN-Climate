@@ -128,6 +128,55 @@ def test_publication_ablation_config_declares_required_variants():
         validate_execution_filters(cfg, variants=["A99"])
 
 
+def test_v2_ablation_config_isolates_each_architectural_change():
+    """The two v2 changes must be removable one at a time.
+
+    Crediting the wide stem and the global readout as a single change would let
+    either carry the other's contribution, so each has its own variant.
+    """
+    path = ROOT / "configs" / "ablations_v2.yaml"
+    with open(path, encoding="utf-8") as handle:
+        cfg = yaml.safe_load(handle)
+    assert validate_ablation_config(cfg, path) == "ablations_cet_v2"
+    assert cfg["model"]["stem"] == "dilated"
+    assert cfg["model"]["readout"] == "attention"
+    variants = {item["id"]: item for item in cfg["variants"]}
+    assert variants["A10"]["stem"] == "local"
+    assert "readout" not in variants["A10"]
+    assert variants["A11"]["readout"] == "last"
+    assert "stem" not in variants["A11"]
+    # The fusion weighting must be the fitted one, or the reliability ablations
+    # would measure the failure mode this study set out to remove.
+    assert cfg["reliability"]["weight_selection"] == "calibration"
+
+
+def test_ablation_config_rejects_an_unknown_stem_or_readout():
+    base = {
+        "experiment": {"name": "bad"},
+        "split": {"train": 0.6, "validation": 0.15, "calibration": 0.10, "test": 0.15},
+        "training": {"deterministic_algorithms": True, "deterministic_warn_only": False},
+        "window": {"history": 365},
+        "model": {"quantiles": [0.05, 0.5, 0.95]},
+        "conformal": {"alpha": 0.10},
+    }
+    required = [
+        {"id": "A0", "encoder": "kan", "quantile_head": True},
+        {"id": "A1", "encoder": "mlp", "quantile_head": True},
+        {"id": "A2", "encoder": "kan", "quantile_head": False},
+        {"id": "A9", "encoder": "kan", "quantile_head": True, "readout": "mean"},
+    ]
+    bad_stem = {**base, "variants": required + [
+        {"id": "AX", "encoder": "kan", "quantile_head": True, "stem": "fourier"}
+    ]}
+    with pytest.raises(ValueError, match="Unknown stem"):
+        validate_ablation_config(bad_stem, Path("configs/bad.yaml"))
+    bad_readout = {**base, "variants": required + [
+        {"id": "AX", "encoder": "kan", "quantile_head": True, "readout": "median"}
+    ]}
+    with pytest.raises(ValueError, match="Unknown readout"):
+        validate_ablation_config(bad_readout, Path("configs/bad.yaml"))
+
+
 def test_ablation_config_rejects_missing_reference_variant():
     cfg = {
         "experiment": {"name": "bad"},

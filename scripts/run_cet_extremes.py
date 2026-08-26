@@ -75,7 +75,7 @@ def atomic_json(path: Path, payload) -> None:
             temporary.unlink()
 
 
-def main(config: Path, policy_path: Path, outdir: Path) -> None:
+def main(config: Path, policy_path: Path, outdir: Path, raw: Path = RAW) -> None:
     cfg = yaml.safe_load(config.read_text(encoding="utf-8"))
     policy = yaml.safe_load(policy_path.read_text(encoding="utf-8"))["extreme"]
     rows = []
@@ -85,7 +85,7 @@ def main(config: Path, policy_path: Path, outdir: Path) -> None:
         for model in cfg["models"]:
             seeds = [-1] if model in {"persistence", "svr"} else cfg["training"]["seeds"]
             for seed in seeds:
-                artifact = RAW / f"cet_{model}_h{horizon}_s{seed}.npz"
+                artifact = raw / f"cet_{model}_h{horizon}_s{seed}.npz"
                 if not artifact.exists():
                     continue
                 with np.load(artifact, allow_pickle=False) as source:
@@ -149,5 +149,10 @@ if __name__ == "__main__":
     parser.add_argument("--config", default=str(ROOT / "configs" / "cet.yaml"))
     parser.add_argument("--policy", default=str(ROOT / "configs" / "robustness.yaml"))
     parser.add_argument("--outdir", default=str(ROOT / "results" / "extremes"))
+    parser.add_argument(
+        "--raw",
+        default=str(RAW),
+        help="Directory of stored test predictions to re-score; no model is retrained.",
+    )
     args = parser.parse_args()
-    main(Path(args.config), Path(args.policy), Path(args.outdir))
+    main(Path(args.config), Path(args.policy), Path(args.outdir), Path(args.raw))

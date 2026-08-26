@@ -40,7 +40,7 @@ from scripts.run_ghcn_reliability import (
     _json_safe,
 )
 from src.data.provenance import file_sha256
-from src.models.trustkan import TrustKAN
+from src.models.trustkan import READOUTS, STEMS, TrustKAN
 from src.reliability.evaluation import evaluate_calibrated_reliability, inverse_standardized
 from src.training.engine import resolve_device, set_seed
 from src.training.trust_engine import predict_trustkan, train_trustkan
@@ -79,11 +79,20 @@ def validate_ablation_config(cfg, config_path):
         raise ValueError(f"Ablation config is missing trained variants {sorted(missing)}")
     if ids[0] != "A0":
         raise ValueError("A0 must be declared first because it is the reference")
+    defaults = cfg["model"]
     for item in variants:
         if item["encoder"] not in {"kan", "mlp"}:
             raise ValueError(f"Unknown encoder for {item['id']}")
         if not isinstance(item["quantile_head"], bool):
             raise ValueError(f"quantile_head must be boolean for {item['id']}")
+        # Caught here rather than at model construction, so a typo fails the
+        # whole config instead of the shard that happens to reach it first.
+        stem = item.get("stem", defaults.get("stem", "local"))
+        if stem not in STEMS:
+            raise ValueError(f"Unknown stem {stem!r} for {item['id']}")
+        readout = item.get("readout", defaults.get("readout", "last"))
+        if readout not in READOUTS:
+            raise ValueError(f"Unknown readout {readout!r} for {item['id']}")
     levels = cfg["model"]["quantiles"]
     alpha = float(cfg["conformal"]["alpha"])
     if not np.isclose(levels[0], alpha / 2.0) or not np.isclose(levels[-1], 1.0 - alpha / 2.0):
@@ -287,7 +296,8 @@ def main(
                     "ablation_label": variant.get("label", variant_id),
                     "encoder": variant["encoder"],
                     "quantile_head": bool(variant["quantile_head"]),
-                    "readout": variant.get("readout", "last"),
+                    "readout": variant.get("readout", cfg["model"].get("readout", "last")),
+                    "stem": variant.get("stem", cfg["model"].get("stem", "local")),
                     "horizon": int(horizon),
                     "seed": int(seed),
                     "split": "test",
@@ -329,7 +339,9 @@ def main(
                         quantiles=quantiles,
                         encoder=variant["encoder"],
                         quantile_head=bool(variant["quantile_head"]),
-                        readout=variant.get("readout", "last"),
+                        readout=variant.get("readout", cfg["model"].get("readout", "last")),
+                        stem=variant.get("stem", cfg["model"].get("stem", "local")),
+                        history=int(cfg["window"]["history"]),
                     )
                     model, history, train_seconds = train_trustkan(
                         model,
