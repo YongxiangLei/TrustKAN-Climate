@@ -64,6 +64,14 @@ def training_targets(cfg, horizon):
     return inverse_target(scaler, y[masks["train"]])
 
 
+def display_path(path: Path) -> str:
+    """Repository-relative when possible, so a relative argument cannot abort a run."""
+    resolved = path.resolve()
+    if resolved.is_relative_to(ROOT):
+        return resolved.relative_to(ROOT).as_posix()
+    return resolved.as_posix()
+
+
 def atomic_json(path: Path, payload) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
@@ -133,7 +141,7 @@ def main(config: Path, policy_path: Path, outdir: Path, raw: Path = RAW) -> None
     frame.to_csv(outdir / "cet_extremes_runs.csv", index=False)
     atomic_json(
         outdir / "cet_extremes_policy.json",
-        {"policy": policy, "config": str(config.relative_to(ROOT).as_posix())},
+        {"policy": policy, "config": display_path(config)},
     )
     summary = frame.groupby(["model", "horizon"])[
         ["cold_rmse", "warm_rmse", "either_rmse", "complement_rmse"]
@@ -141,7 +149,7 @@ def main(config: Path, policy_path: Path, outdir: Path, raw: Path = RAW) -> None
     summary.to_csv(outdir / "cet_extremes_summary.csv")
     print("\nMean RMSE by subset (degC):")
     print(summary.round(3).to_string())
-    print(f"\nwrote {outdir.relative_to(ROOT)}")
+    print(f"\nwrote {display_path(outdir)}")
 
 
 if __name__ == "__main__":

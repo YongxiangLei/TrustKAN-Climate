@@ -27,9 +27,26 @@ import yaml
 import _bootstrap  # noqa: F401  # repository-root import setup
 
 ROOT = Path(__file__).resolve().parents[1]
-RELIABILITY_RAW = ROOT / "results" / "reliability" / "raw" / "cet_reliability_full"
-ABLATION_RAW = ROOT / "results" / "ablations" / "raw" / "ablations_cet_full"
-ABLATION_CONFIG = ROOT / "configs" / "ablations.yaml"
+# Each study writes to its own experiment names so the corrected architecture
+# could be evaluated without disturbing the published artifacts; the figures
+# have to follow the same split or they would mix the two.
+STUDY_PATHS = {
+    "v1": {
+        "reliability": ROOT / "results" / "reliability" / "raw" / "cet_reliability_full",
+        "ablations": ROOT / "results" / "ablations" / "raw" / "ablations_cet_full",
+        "config": ROOT / "configs" / "ablations.yaml",
+        "prefix": "cet_trustkan_reliability",
+    },
+    "v2": {
+        "reliability": ROOT / "results" / "reliability" / "raw" / "cet_reliability_v2",
+        "ablations": ROOT / "results" / "ablations" / "raw" / "ablations_cet_v2",
+        "config": ROOT / "configs" / "ablations_v2.yaml",
+        "prefix": "cet_trustkan_reliability",
+    },
+}
+RELIABILITY_RAW = STUDY_PATHS["v1"]["reliability"]
+ABLATION_RAW = STUDY_PATHS["v1"]["ablations"]
+ABLATION_CONFIG = STUDY_PATHS["v1"]["config"]
 HORIZONS = (1, 7, 30, 90)
 SEEDS = (11, 22, 33, 44, 55)
 GRID = np.linspace(0.05, 1.0, 96)
@@ -388,7 +405,25 @@ def rolling_macros(out: Path, window: int) -> None:
     print(f"  wrote {out.relative_to(ROOT)}")
 
 
-def main(outdir: Path) -> None:
+def select_study(study: str) -> None:
+    """Point every reader at one study's artifacts before any figure is drawn."""
+    global RELIABILITY_RAW, ABLATION_RAW, ABLATION_CONFIG
+    global CURVE_RAW, CURVE_STABILITY, CURVE_SHAPES
+    paths = STUDY_PATHS[study]
+    RELIABILITY_RAW = paths["reliability"]
+    ABLATION_RAW = paths["ablations"]
+    ABLATION_CONFIG = paths["config"]
+    suffix = "" if study == "v1" else f"_{study}"
+    interpretability = ROOT / "results" / "interpretability"
+    CURVE_RAW = interpretability / "raw" / f"cet_kan_curves{suffix}"
+    CURVE_STABILITY = (
+        interpretability / "aggregated" / f"cet_kan_curves{suffix}_stability.csv"
+    )
+    CURVE_SHAPES = interpretability / "aggregated" / f"cet_kan_curves{suffix}_shapes.csv"
+
+
+def main(outdir: Path, study: str = "v1") -> None:
+    select_study(study)
     if not RELIABILITY_RAW.exists():
         raise SystemExit(f"missing {RELIABILITY_RAW.relative_to(ROOT)}")
     fingerprints = set()
@@ -437,5 +472,6 @@ def main(outdir: Path) -> None:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--outdir", default=str(ROOT / "paper" / "figures"))
+    parser.add_argument("--study", choices=sorted(STUDY_PATHS), default="v1")
     args = parser.parse_args()
-    main(Path(args.outdir))
+    main(Path(args.outdir), args.study)

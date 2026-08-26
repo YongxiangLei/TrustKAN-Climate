@@ -51,14 +51,13 @@ FAMILY_SETS = {"primary": FAMILY, "v2": V2_FAMILY}
 # Variants trained by the stem pilots rather than by the frozen campaign. The
 # protocol is identical, so pairs remain matched on origin and seed, but the
 # artifacts live under their own experiment names.
-PILOT_RAW = {
-    "trustkan_v2": ROOT / "results" / "raw" / "cet_stem_pilot_v2",
-    "trustkan_dilated": ROOT / "results" / "raw" / "cet_stem_pilot",
-}
+V2_RAW = ROOT / "results" / "raw" / "cet_v2_neural"
+RAW_BY_FAMILY = {"primary": RAW, "v2": V2_RAW}
+_raw_dir = RAW
 
 
 def artifact(model: str, horizon: int, seed: int) -> Path:
-    return PILOT_RAW.get(model, RAW) / f"cet_{model}_h{horizon}_s{seed}.npz"
+    return _raw_dir / f"cet_{model}_h{horizon}_s{seed}.npz"
 
 
 def atomic_json(path: Path, payload) -> None:
@@ -136,7 +135,12 @@ def compare_pair(a_model, b_model, horizon, seed, n_boot, confidence):
     return result, str(a["code_sha256"].item())
 
 
-def main(outdir: Path, n_boot: int, confidence: float, families=FAMILY) -> None:
+def main(outdir: Path, n_boot: int, confidence: float, families=FAMILY, raw=RAW) -> None:
+    global _raw_dir
+    # Every pair in a family must come from one campaign, so both artifacts
+    # carry the same config and code fingerprints and validate_pair can insist
+    # on it rather than the comparison quietly spanning two protocols.
+    _raw_dir = raw
     alpha = 1 - confidence
     index = []
     for a_model, b_model, isolates in families:
@@ -232,7 +236,11 @@ def main(outdir: Path, n_boot: int, confidence: float, families=FAMILY) -> None:
             f"B better {row['b_better']}/{row['n_pairs']}, "
             f"inconclusive {row['inconclusive']}/{row['n_pairs']}"
         )
-    print(f"\nwrote artifacts to {outdir.relative_to(ROOT)}")
+    # A relative --outdir is not under ROOT as far as pathlib is concerned, and
+    # failing here would discard a completed comparison over a log line.
+    resolved = outdir.resolve()
+    shown = resolved.relative_to(ROOT) if resolved.is_relative_to(ROOT) else resolved
+    print(f"\nwrote artifacts to {shown}")
 
 
 if __name__ == "__main__":
@@ -249,4 +257,5 @@ if __name__ == "__main__":
         args.n_boot,
         args.confidence,
         families=FAMILY_SETS[args.family],
+        raw=RAW_BY_FAMILY[args.family],
     )
