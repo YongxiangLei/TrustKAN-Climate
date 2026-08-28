@@ -56,6 +56,31 @@ from src.training.engine import predict, resolve_device, set_seed, train_regress
 ROOT = Path(__file__).resolve().parents[1]
 BENCHMARK_LEDGER = ROOT / "results" / "aggregated" / "cet_full_runs.csv"
 RUN_NAME = "cet_receptive_field"
+# The audit is only worth reporting for models whose weights are the reported
+# ones, so each study names the ledger its runs must reproduce. The v2 list is
+# longer than the corruption family on purpose: the two stems and the two
+# readouts have to be measured side by side for the correction to be legible as
+# a measurement rather than a claim.
+STUDIES = {
+    "v1": {
+        "ledger": ROOT / "results" / "aggregated" / "cet_full_runs.csv",
+        "run_name": "cet_receptive_field",
+        "output": "cet_receptive_fields.csv",
+        "models": MODELS,
+    },
+    "v2": {
+        "ledger": ROOT / "results" / "aggregated" / "cet_v2_neural_runs.csv",
+        "run_name": "cet_receptive_field_v2",
+        "output": "cet_receptive_fields_v2.csv",
+        "models": (
+            "trustkan_v2",
+            "trustkan_dilated",
+            "trustkan",
+            "kan",
+            "transformer",
+        ),
+    },
+}
 # Large enough to clear any activation's dead zone, so a reachable timestep
 # cannot be missed for want of signal.
 PROBE = 10.0
@@ -103,16 +128,28 @@ def receptive_field(model, history: int, device) -> int:
     return int(reach)
 
 
-def main(config, *, horizons=None, models=None, seed=None, device=None):
+def main(
+    config,
+    *,
+    horizons=None,
+    models=None,
+    seed=None,
+    device=None,
+    benchmark_ledger=None,
+    run_name=RUN_NAME,
+    output_name="cet_receptive_fields.csv",
+    resume=False,
+):
     cfg = load_config(config)
     cfg_hash = config_sha256(cfg)
     source_hash = code_sha256()
     data_hash = str(cfg["dataset"].get("sha256", "")).lower()
     resolved_device = resolve_device(device)
 
-    if not BENCHMARK_LEDGER.exists():
-        raise SystemExit(f"missing {BENCHMARK_LEDGER.relative_to(ROOT)}")
-    ledger = pd.read_csv(BENCHMARK_LEDGER)
+    benchmark_ledger = Path(benchmark_ledger or BENCHMARK_LEDGER)
+    if not benchmark_ledger.exists():
+        raise SystemExit(f"missing {benchmark_ledger}")
+    ledger = pd.read_csv(benchmark_ledger)
     ledger = ledger[ledger.status.eq("ok")]
     expected = {
         (str(r.model), int(r.horizon), int(r.seed)): float(r.rmse) for r in ledger.itertuples()
@@ -134,7 +171,7 @@ def main(config, *, horizons=None, models=None, seed=None, device=None):
     expected_step = pd.to_timedelta(cfg["dataset"]["frequency"]).to_timedelta64()
     history = int(cfg["window"]["history"])
 
-    record_dir = ROOT / "results" / "robustness" / "runs" / RUN_NAME
+    record_dir = ROOT / "results" / "robustness" / "runs" / run_name
     aggregated_dir = ROOT / "results" / "robustness" / "aggregated"
     for directory in (record_dir, aggregated_dir):
         directory.mkdir(parents=True, exist_ok=True)
@@ -144,6 +181,26 @@ def main(config, *, horizons=None, models=None, seed=None, device=None):
     run_seed = int(seed if seed is not None else cfg["training"]["seeds"][0])
     rows = []
     for name in run_models:
+        # Retraining a model only to discard the measurement already on disk is
+        # pure cost, and this runner is driven by a loop that restarts it after
+        # the cuDNN teardown abort.
+        if resume:
+            stored = [
+                json.loads((record_dir / f"{name}_h{h}_s{run_seed}.json").read_text("utf-8"))
+                for h in run_horizons
+                if (record_dir / f"{name}_h{h}_s{run_seed}.json").is_file()
+            ]
+            usable = [
+                row
+                for row in stored
+                if row.get("status") == "ok"
+                and row.get("code_sha256") == source_hash
+                and row.get("config_sha256") == cfg_hash
+            ]
+            if len(usable) == len(run_horizons):
+                rows.extend(usable)
+                print(f"RESUME {name} ({len(usable)} horizons)")
+                continue
         # The control shares the architecture but not the training, so a
         # difference between the two would mean the reach depends on weights.
         set_seed(0, deterministic=False, warn_only=True)
@@ -238,7 +295,7 @@ def main(config, *, horizons=None, models=None, seed=None, device=None):
     if not ok:
         raise SystemExit("no receptive-field rows were produced")
     frame = pd.DataFrame(ok)
-    out = aggregated_dir / "cet_receptive_fields.csv"
+    out = aggregated_dir / output_name
     frame.to_csv(out, index=False)
     print(f"  wrote {out.relative_to(ROOT)}")
     spread = frame.groupby("model").receptive_field.nunique()
@@ -254,11 +311,23 @@ if __name__ == "__main__":
     parser.add_argument("--model", action="append", dest="models")
     parser.add_argument("--seed", type=int, default=None)
     parser.add_argument("--device", default=None)
+    parser.add_argument("--resume", action="store_true")
+    parser.add_argument(
+        "--study",
+        choices=sorted(STUDIES),
+        default="v1",
+        help="Which campaign's ledger the retrained weights must reproduce.",
+    )
     args = parser.parse_args()
+    study = STUDIES[args.study]
     main(
         args.config,
         horizons=args.horizons,
-        models=args.models,
+        models=args.models or study["models"],
         seed=args.seed,
         device=args.device,
+        benchmark_ledger=study["ledger"],
+        run_name=study["run_name"],
+        output_name=study["output"],
+        resume=args.resume,
     )

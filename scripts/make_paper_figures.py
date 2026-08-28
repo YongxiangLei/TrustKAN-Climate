@@ -44,9 +44,12 @@ STUDY_PATHS = {
         "prefix": "cet_trustkan_reliability",
     },
 }
-RELIABILITY_RAW = STUDY_PATHS["v1"]["reliability"]
-ABLATION_RAW = STUDY_PATHS["v1"]["ablations"]
-ABLATION_CONFIG = STUDY_PATHS["v1"]["config"]
+# See scripts/make_paper_tables.py: the default is the manuscript's study so a
+# bare invocation cannot swap the committed figures for another campaign's.
+MANUSCRIPT_STUDY = "v2"
+RELIABILITY_RAW = STUDY_PATHS[MANUSCRIPT_STUDY]["reliability"]
+ABLATION_RAW = STUDY_PATHS[MANUSCRIPT_STUDY]["ablations"]
+ABLATION_CONFIG = STUDY_PATHS[MANUSCRIPT_STUDY]["config"]
 HORIZONS = (1, 7, 30, 90)
 SEEDS = (11, 22, 33, 44, 55)
 GRID = np.linspace(0.05, 1.0, 96)
@@ -108,7 +111,7 @@ def save(figure, path: Path) -> None:
         if temporary.exists():
             temporary.unlink()
     plt.close(figure)
-    print(f"  wrote {path.relative_to(ROOT)}")
+    print(f"  wrote {display_path(path)}")
 
 
 def mean_curve(horizon: int, key: str):
@@ -347,7 +350,7 @@ def curve_macros(out: Path) -> None:
     macro("curveSeedPairs", f"{len(table[table.horizon.eq(1)])}")
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    print(f"  wrote {out.relative_to(ROOT)}")
+    print(f"  wrote {display_path(out)}")
 
 
 def rolling_macros(out: Path, window: int) -> None:
@@ -402,7 +405,15 @@ def rolling_macros(out: Path, window: int) -> None:
         lines.append(rf"\newcommand{{\staticCoverageFloor}}{{{min(floors):.2f}}}")
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    print(f"  wrote {out.relative_to(ROOT)}")
+    print(f"  wrote {display_path(out)}")
+
+
+def display_path(path: Path) -> str:
+    """Repository-relative when possible, so a relative --outdir cannot abort a run."""
+    resolved = path.resolve()
+    if resolved.is_relative_to(ROOT):
+        return resolved.relative_to(ROOT).as_posix()
+    return resolved.as_posix()
 
 
 def select_study(study: str) -> None:
@@ -422,7 +433,7 @@ def select_study(study: str) -> None:
     CURVE_SHAPES = interpretability / "aggregated" / f"cet_kan_curves{suffix}_shapes.csv"
 
 
-def main(outdir: Path, study: str = "v1") -> None:
+def main(outdir: Path, study: str = MANUSCRIPT_STUDY) -> None:
     select_study(study)
     if not RELIABILITY_RAW.exists():
         raise SystemExit(f"missing {RELIABILITY_RAW.relative_to(ROOT)}")
@@ -466,12 +477,12 @@ def main(outdir: Path, study: str = "v1") -> None:
         + "\n",
         encoding="utf-8",
     )
-    print(f"  wrote {(outdir / 'figure_provenance.json').relative_to(ROOT)}")
+    print(f"  wrote {display_path(outdir / 'figure_provenance.json')}")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--outdir", default=str(ROOT / "paper" / "figures"))
-    parser.add_argument("--study", choices=sorted(STUDY_PATHS), default="v1")
+    parser.add_argument("--study", choices=sorted(STUDY_PATHS), default=MANUSCRIPT_STUDY)
     args = parser.parse_args()
     main(Path(args.outdir), args.study)

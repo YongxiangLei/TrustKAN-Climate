@@ -1,0 +1,60 @@
+# Spot check that the v2 source edits are inert for the classical baselines.
+#
+# The full classical shard costs about twenty-five hours, almost all of it in
+# the SVR hyperparameter search at long horizons (the frozen ledger records
+# 45,463 search seconds at h=90 alone), so re-running it under the new
+# fingerprint is not affordable and Table~\ref{tab:cet_rmse} reports those rows
+# from the frozen campaign. That is only sound if the edit cannot reach them.
+#
+# One horizon and one seed make the argument checkable: both models are refitted
+# under the current code and their stored test predictions are compared with the
+# frozen ones bit for bit by scripts/verify_baseline_inertness.py. Everything
+# except the experiment name, the horizon list, and the seed list is copied
+# verbatim from cet.yaml, so a difference could only come from the source tree.
+experiment:
+  name: cet_v2_classical_probe
+
+dataset:
+  name: CET_Pershore_College
+  source: https://raw.githubusercontent.com/YongxiangLei/kan_proj/d4458e8fb11883b2eec0994aaaa6b7914e7f9e60/cet_mean_station_series.csv
+  date_column: date
+  target_column: Pershore_College
+  frequency: 1D
+  min_valid_temperature: -20.0
+  sha256: c54a9da8a66e71368ebf1dde70d8f6d8110d63bb15d39969e34568f5089048f7
+
+window:
+  history: 365
+  horizons: [1]
+
+split:
+  train: 0.60
+  validation: 0.15
+  calibration: 0.10
+  test: 0.15
+
+training:
+  seeds: [11]
+  batch_size: 64
+  epochs: 100
+  patience: 10
+  learning_rate: 0.001
+  optimizer: adamw
+  weight_decay: 0.01
+  deterministic_algorithms: true
+  deterministic_warn_only: false
+
+models:
+  - svr
+  - random_forest
+
+model_search:
+  svr:
+    - {c: 1.0, epsilon: 0.05, gamma: scale}
+    - {c: 10.0, epsilon: 0.05, gamma: scale}
+    - {c: 10.0, epsilon: 0.1, gamma: scale}
+    - {c: 100.0, epsilon: 0.1, gamma: scale}
+  random_forest:
+    - {n_estimators: 300, max_depth: 12, min_samples_leaf: 1}
+    - {n_estimators: 300, max_depth: 24, min_samples_leaf: 1}
+    - {n_estimators: 300, max_depth: null, min_samples_leaf: 1}

@@ -60,6 +60,23 @@ RUN_NAME = "cet_robustness"
 # The pre-specified comparison family: the proposed model and the two
 # comparators fixed against it before any result was seen.
 MODELS = ("trustkan", "kan", "transformer")
+# A second architecture has to be swept without overwriting the first, and the
+# ledger it must reproduce is the one its own campaign wrote. Naming the pairs
+# here keeps a caller from combining a v2 run name with the v1 ledger, which
+# would fail the clean-cell gate for a reason that has nothing to do with the
+# model.
+STUDIES = {
+    "v1": {
+        "ledger": ROOT / "results" / "aggregated" / "cet_full_runs.csv",
+        "run_name": "cet_robustness",
+        "models": ("trustkan", "kan", "transformer"),
+    },
+    "v2": {
+        "ledger": ROOT / "results" / "aggregated" / "cet_v2_neural_runs.csv",
+        "run_name": "cet_robustness_v2",
+        "models": ("trustkan_v2", "kan", "transformer"),
+    },
+}
 # Deterministic training should land on the ledger value exactly; the tolerance
 # only absorbs float accumulation in a different summation order.
 RMSE_TOLERANCE = 1e-6
@@ -99,7 +116,18 @@ def make_predictor(model, scaler, horizon: int, batch_size: int, device):
     return predict_fn
 
 
-def main(config, robustness_config, *, horizons=None, models=None, seeds=None, device=None, resume=False):
+def main(
+    config,
+    robustness_config,
+    *,
+    horizons=None,
+    models=None,
+    seeds=None,
+    device=None,
+    resume=False,
+    benchmark_ledger=None,
+    run_name=RUN_NAME,
+):
     cfg = load_config(config)
     policy = load_config(robustness_config)
     cfg_hash = config_sha256(cfg)
@@ -108,9 +136,10 @@ def main(config, robustness_config, *, horizons=None, models=None, seeds=None, d
     data_hash = str(cfg["dataset"].get("sha256", "")).lower()
     resolved_device = resolve_device(device)
 
-    if not BENCHMARK_LEDGER.exists():
-        raise SystemExit(f"missing {BENCHMARK_LEDGER.relative_to(ROOT)}")
-    ledger = pd.read_csv(BENCHMARK_LEDGER)
+    benchmark_ledger = Path(benchmark_ledger or BENCHMARK_LEDGER)
+    if not benchmark_ledger.exists():
+        raise SystemExit(f"missing {benchmark_ledger}")
+    ledger = pd.read_csv(benchmark_ledger)
     ledger = ledger[ledger.status.eq("ok")]
     expected = {
         (str(row.model), int(row.horizon), int(row.seed)): float(row.rmse)
@@ -130,8 +159,8 @@ def main(config, robustness_config, *, horizons=None, models=None, seeds=None, d
     expected_step = pd.to_timedelta(cfg["dataset"]["frequency"]).to_timedelta64()
     frequency = str(cfg["dataset"]["frequency"])
 
-    raw_dir = ROOT / "results" / "robustness" / "raw" / RUN_NAME
-    record_dir = ROOT / "results" / "robustness" / "runs" / RUN_NAME
+    raw_dir = ROOT / "results" / "robustness" / "raw" / run_name
+    record_dir = ROOT / "results" / "robustness" / "runs" / run_name
     aggregated_dir = ROOT / "results" / "robustness" / "aggregated"
     for directory in (raw_dir, record_dir, aggregated_dir):
         directory.mkdir(parents=True, exist_ok=True)
@@ -279,15 +308,15 @@ def main(config, robustness_config, *, horizons=None, models=None, seeds=None, d
     if not rows:
         raise SystemExit("no robustness rows were produced")
     frame = pd.DataFrame(rows)
-    frame.to_csv(aggregated_dir / f"{RUN_NAME}_grid.csv", index=False)
+    frame.to_csv(aggregated_dir / f"{run_name}_grid.csv", index=False)
     summary = frame.groupby(["model", "horizon", "kind", "level"], as_index=False).agg(
         n=("model_seed", "count"),
         rmse_mean=("rmse", "mean"),
         rmse_sd=("rmse", "std"),
         relative_increase_mean=("relative_increase", "mean"),
     )
-    summary.to_csv(aggregated_dir / f"{RUN_NAME}_summary.csv", index=False)
-    print(f"  wrote {(aggregated_dir / f'{RUN_NAME}_summary.csv').relative_to(ROOT)}")
+    summary.to_csv(aggregated_dir / f"{run_name}_summary.csv", index=False)
+    print(f"  wrote {(aggregated_dir / f'{run_name}_summary.csv').relative_to(ROOT)}")
     return rows
 
 
@@ -300,13 +329,22 @@ if __name__ == "__main__":
     parser.add_argument("--seed", action="append", type=int, dest="seeds")
     parser.add_argument("--device", default=None)
     parser.add_argument("--resume", action="store_true")
+    parser.add_argument(
+        "--study",
+        choices=sorted(STUDIES),
+        default="v1",
+        help="Which campaign's ledger the clean cell must reproduce, and where to write.",
+    )
     args = parser.parse_args()
+    study = STUDIES[args.study]
     main(
         args.config,
         args.robustness_config,
         horizons=args.horizons,
-        models=args.models,
+        models=args.models or study["models"],
         seeds=args.seeds,
         device=args.device,
         resume=args.resume,
+        benchmark_ledger=study["ledger"],
+        run_name=study["run_name"],
     )

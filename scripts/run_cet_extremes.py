@@ -83,18 +83,52 @@ def atomic_json(path: Path, payload) -> None:
             temporary.unlink()
 
 
-def main(config: Path, policy_path: Path, outdir: Path, raw: Path = RAW) -> None:
+def resolve_artifact(raws: list[Path], name: str) -> Path | None:
+    """First matching artifact across raw directories, so a later campaign can
+    quote models it did not re-run without mixing two copies of the same file.
+    """
+    for raw in raws:
+        candidate = raw / name
+        if candidate.exists():
+            return candidate
+    return None
+
+
+def discover_models(raws: list[Path]) -> list[str]:
+    """Model names present in any raw directory, parsed from the artifact stem.
+
+    A later campaign's config may omit models it quotes from an earlier one
+    (the classical shard) or add models the earlier config never named (the
+    corrected architecture). Scoring only `cfg["models"]` would silently drop
+    one of those sets.
+    """
+    found = set()
+    for raw in raws:
+        for path in raw.glob("cet_*_h*_s*.npz"):
+            stem = path.stem
+            body = stem[len("cet_") :]
+            marker = body.rfind("_h")
+            if marker <= 0:
+                continue
+            found.add(body[:marker])
+    return sorted(found)
+
+
+def main(config: Path, policy_path: Path, outdir: Path, raws=None) -> None:
     cfg = yaml.safe_load(config.read_text(encoding="utf-8"))
     policy = yaml.safe_load(policy_path.read_text(encoding="utf-8"))["extreme"]
+    raws = [Path(item) for item in (raws or [RAW])]
+    models = sorted(set(cfg["models"]) | set(discover_models(raws)))
+    print(f"scoring {len(models)} models: {', '.join(models)}")
     rows = []
     for horizon in cfg["window"]["horizons"]:
         train_target = training_targets(cfg, horizon)
         print(f"\nhorizon {horizon}: {train_target.shape[0]} training origins")
-        for model in cfg["models"]:
+        for model in models:
             seeds = [-1] if model in {"persistence", "svr"} else cfg["training"]["seeds"]
             for seed in seeds:
-                artifact = raw / f"cet_{model}_h{horizon}_s{seed}.npz"
-                if not artifact.exists():
+                artifact = resolve_artifact(raws, f"cet_{model}_h{horizon}_s{seed}.npz")
+                if artifact is None:
                     continue
                 with np.load(artifact, allow_pickle=False) as source:
                     target = source["target"]
@@ -159,8 +193,18 @@ if __name__ == "__main__":
     parser.add_argument("--outdir", default=str(ROOT / "results" / "extremes"))
     parser.add_argument(
         "--raw",
-        default=str(RAW),
-        help="Directory of stored test predictions to re-score; no model is retrained.",
+        action="append",
+        dest="raws",
+        help=(
+            "Directory of stored test predictions to re-score; no model is retrained. "
+            "Pass more than once to search later directories for models the first "
+            "campaign did not produce; the first match wins."
+        ),
     )
     args = parser.parse_args()
-    main(Path(args.config), Path(args.policy), Path(args.outdir), Path(args.raw))
+    main(
+        Path(args.config),
+        Path(args.policy),
+        Path(args.outdir),
+        [Path(item) for item in (args.raws or [str(RAW)])],
+    )

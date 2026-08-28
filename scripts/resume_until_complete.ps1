@@ -9,7 +9,12 @@ param(
     [Parameter(Mandatory = $true)][string]$RecordDir,
     [Parameter(Mandatory = $true)][int]$Expected,
     [string]$Runner = "scripts/run_cet_benchmark.py",
-    [int]$MaxAttempts = 40
+    [int]$MaxAttempts = 40,
+    # Runner-specific switches as one string, e.g. -ExtraArgs "--study v2".
+    # A string[] Extra whose items start with dashes is rebound by powershell
+    # -File as parameters of this script, which is how a previous invocation
+    # sent "v2" to -MaxAttempts and never started the campaign.
+    [string]$ExtraArgs = ""
 )
 
 $python = "C:\Users\79441\Documents\Codex\.venvs\trustkan\Scripts\python.exe"
@@ -28,7 +33,11 @@ while ($attempt -lt $MaxAttempts) {
         break
     }
     Write-Output "attempt $attempt : $before/$Expected records, resuming"
-    & $python $Runner --config $Config --device cuda --resume 2>&1 | Out-Null
+    $extra = @()
+    if ($ExtraArgs) {
+        $extra = $ExtraArgs.Split(" ", [System.StringSplitOptions]::RemoveEmptyEntries)
+    }
+    & $python $Runner --config $Config --device cuda --resume @extra 2>&1 | Out-Null
     $after = Get-RecordCount
     Write-Output "attempt $attempt : $before -> $after"
     if ($after -le $before) {
