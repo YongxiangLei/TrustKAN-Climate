@@ -1,7 +1,7 @@
 # Finish the three v2 campaigns that still have to run, in order, on one GPU.
 # Each inner loop is the same record-count resume used elsewhere: Windows
 # cuDNN teardown aborts after a record is written, so exit codes are ignored.
-$ErrorActionPreference = "Stop"
+$ErrorActionPreference = "Continue"
 $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
 $resume = Join-Path $PSScriptRoot "resume_until_complete.ps1"

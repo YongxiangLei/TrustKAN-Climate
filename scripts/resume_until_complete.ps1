@@ -18,6 +18,11 @@ param(
 )
 
 $python = "C:\Users\79441\Documents\Codex\.venvs\trustkan\Scripts\python.exe"
+# Python writes warnings to stderr, and on Windows a cuDNN teardown often
+# exits non-zero after the record is already on disk. Neither is a reason to
+# abort this loop; a parent $ErrorActionPreference=Stop would otherwise treat
+# the transformer UserWarning as a terminating error.
+$ErrorActionPreference = "Continue"
 
 function Get-RecordCount {
     if (-not (Test-Path $RecordDir)) { return 0 }
@@ -33,11 +38,9 @@ while ($attempt -lt $MaxAttempts) {
         break
     }
     Write-Output "attempt $attempt : $before/$Expected records, resuming"
-    $extra = @()
-    if ($ExtraArgs) {
-        $extra = $ExtraArgs.Split(" ", [System.StringSplitOptions]::RemoveEmptyEntries)
-    }
-    & $python $Runner --config $Config --device cuda --resume @extra 2>&1 | Out-Null
+    $argLine = "--config `"$Config`" --device cuda --resume"
+    if ($ExtraArgs) { $argLine += " $ExtraArgs" }
+    cmd.exe /c "`"$python`" $Runner $argLine >nul 2>&1" | Out-Null
     $after = Get-RecordCount
     Write-Output "attempt $attempt : $before -> $after"
     if ($after -le $before) {
