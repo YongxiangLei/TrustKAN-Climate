@@ -33,6 +33,11 @@ except ModuleNotFoundError:
 ROOT = Path(__file__).resolve().parents[1]
 RAW = ROOT / "results" / "interpretability" / "raw" / "cet_kan_curves"
 AGGREGATED = ROOT / "results" / "interpretability" / "aggregated"
+# One namespace per study, so curves extracted from the corrected architecture
+# never land on top of the published ones. See scripts/make_paper_tables.py for
+# why the manuscript's study is the default.
+STUDIES = {"v1": "cet_kan_curves", "v2": "cet_kan_curves_v2"}
+MANUSCRIPT_STUDY = "v2"
 HORIZONS = (1, 7, 30, 90)
 SEEDS = (11, 22, 33, 44, 55)
 VARIANCE_TARGET = 0.95
@@ -110,7 +115,10 @@ def shuffled_control(unit_a: np.ndarray, unit_b: np.ndarray, seed: int = 0) -> n
     return index_matched(unit_a, unit_b[rng.permutation(len(unit_b))])
 
 
-def main(outdir: Path) -> None:
+def main(outdir: Path, study: str = MANUSCRIPT_STUDY) -> None:
+    global RAW
+    run_name = STUDIES[study]
+    RAW = ROOT / "results" / "interpretability" / "raw" / run_name
     if not RAW.is_dir():
         raise SystemExit(f"missing {RAW.relative_to(ROOT)}; run scripts/run_kan_curves.py")
     per_run, per_pair = [], []
@@ -177,11 +185,11 @@ def main(outdir: Path) -> None:
     outdir.mkdir(parents=True, exist_ok=True)
     runs = pd.DataFrame(per_run)
     pairs = pd.DataFrame(per_pair)
-    runs.to_csv(outdir / "cet_kan_curves_shapes.csv", index=False)
-    pairs.to_csv(outdir / "cet_kan_curves_stability.csv", index=False)
-    print(f"  wrote {(outdir / 'cet_kan_curves_shapes.csv').relative_to(ROOT)}")
-    print(f"  wrote {(outdir / 'cet_kan_curves_stability.csv').relative_to(ROOT)}")
-    (outdir / "cet_kan_curves_analysis.json").write_text(
+    runs.to_csv(outdir / f"{run_name}_shapes.csv", index=False)
+    pairs.to_csv(outdir / f"{run_name}_stability.csv", index=False)
+    print(f"  wrote {(outdir / f'{run_name}_shapes.csv').relative_to(ROOT)}")
+    print(f"  wrote {(outdir / f'{run_name}_stability.csv').relative_to(ROOT)}")
+    (outdir / f"{run_name}_analysis.json").write_text(
         json.dumps(
             {
                 "variance_target": VARIANCE_TARGET,
@@ -209,5 +217,6 @@ def main(outdir: Path) -> None:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--outdir", default=str(AGGREGATED))
+    parser.add_argument("--study", choices=sorted(STUDIES), default=MANUSCRIPT_STUDY)
     args = parser.parse_args()
-    main(Path(args.outdir))
+    main(Path(args.outdir), args.study)

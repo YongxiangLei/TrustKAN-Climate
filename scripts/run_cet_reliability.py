@@ -237,6 +237,9 @@ def main(
                     hidden_dim=cfg["model"]["hidden_dim"],
                     grid_size=cfg["model"]["grid_size"],
                     quantiles=quantiles,
+                    stem=cfg["model"].get("stem", "local"),
+                    readout=cfg["model"].get("readout", "last"),
+                    history=int(cfg["window"]["history"]),
                 )
                 model, history, train_seconds = train_trustkan(
                     model,
@@ -272,6 +275,9 @@ def main(
                     quantile_levels=quantiles,
                     alpha=cfg["conformal"]["alpha"],
                     reliability_weights=cfg["reliability"]["fusion_weights"],
+                    weight_selection=cfg["reliability"].get(
+                        "weight_selection", "frozen"
+                    ),
                     min_coverage=cfg["reliability"]["min_calibration_coverage"],
                     error_quantile=cfg["reliability"]["error_quantile"],
                 )

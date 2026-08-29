@@ -116,16 +116,39 @@ def test_missing_ledger_is_an_error_not_an_empty_table(tmp_path):
         make_paper_tables.load_ok(tmp_path / "absent.csv", LIVE)
 
 
+def test_imported_rows_must_carry_a_superseded_fingerprint(tmp_path):
+    path = ledger(
+        tmp_path,
+        [run_row(model="svr", code_sha256=SUPERSEDED), run_row(model="mlp")],
+    )
+    kept = make_paper_tables.load_imported(path, LIVE, ("svr", "random_forest"))
+    assert list(kept.model) == ["svr"]
+    with pytest.raises(SystemExit, match="carries the live fingerprint"):
+        make_paper_tables.load_imported(path, LIVE, ("mlp",))
+
+
+def test_imported_rescored_rows_do_not_require_a_status_column(tmp_path):
+    row = run_row(model="svr", code_sha256=SUPERSEDED)
+    del row["status"]
+    path = ledger(tmp_path, [row])
+    kept = make_paper_tables.load_imported(
+        path, LIVE, ("svr",), has_status=False
+    )
+    assert list(kept.model) == ["svr"]
+
+
 GENERATORS = (
     ("make_paper_tables.py", "tables"),
     ("make_paper_figures.py", "figures"),
     ("analyze_robustness.py", "tables"),
 )
+# The ledgers the manuscript's own study reads. The generators default to that
+# study, so this is what a bare invocation needs to be present.
 LEDGERS = (
-    ROOT / "results" / "aggregated" / "cet_full_runs.csv",
-    ROOT / "results" / "reliability" / "aggregated" / "cet_reliability_full_runs.csv",
-    ROOT / "results" / "robustness" / "aggregated" / "cet_robustness_grid.csv",
-    ROOT / "results" / "robustness" / "aggregated" / "cet_receptive_fields.csv",
+    ROOT / "results" / "aggregated" / "cet_v2_neural_runs.csv",
+    ROOT / "results" / "reliability" / "aggregated" / "cet_reliability_v2_runs.csv",
+    ROOT / "results" / "robustness" / "aggregated" / "cet_robustness_v2_grid.csv",
+    ROOT / "results" / "robustness" / "aggregated" / "cet_receptive_fields_v2.csv",
 )
 
 

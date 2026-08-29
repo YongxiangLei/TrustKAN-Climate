@@ -27,9 +27,29 @@ import yaml
 import _bootstrap  # noqa: F401  # repository-root import setup
 
 ROOT = Path(__file__).resolve().parents[1]
-RELIABILITY_RAW = ROOT / "results" / "reliability" / "raw" / "cet_reliability_full"
-ABLATION_RAW = ROOT / "results" / "ablations" / "raw" / "ablations_cet_full"
-ABLATION_CONFIG = ROOT / "configs" / "ablations.yaml"
+# Each study writes to its own experiment names so the corrected architecture
+# could be evaluated without disturbing the published artifacts; the figures
+# have to follow the same split or they would mix the two.
+STUDY_PATHS = {
+    "v1": {
+        "reliability": ROOT / "results" / "reliability" / "raw" / "cet_reliability_full",
+        "ablations": ROOT / "results" / "ablations" / "raw" / "ablations_cet_full",
+        "config": ROOT / "configs" / "ablations.yaml",
+        "prefix": "cet_trustkan_reliability",
+    },
+    "v2": {
+        "reliability": ROOT / "results" / "reliability" / "raw" / "cet_reliability_v2",
+        "ablations": ROOT / "results" / "ablations" / "raw" / "ablations_cet_v2",
+        "config": ROOT / "configs" / "ablations_v2.yaml",
+        "prefix": "cet_trustkan_reliability",
+    },
+}
+# See scripts/make_paper_tables.py: the default is the manuscript's study so a
+# bare invocation cannot swap the committed figures for another campaign's.
+MANUSCRIPT_STUDY = "v2"
+RELIABILITY_RAW = STUDY_PATHS[MANUSCRIPT_STUDY]["reliability"]
+ABLATION_RAW = STUDY_PATHS[MANUSCRIPT_STUDY]["ablations"]
+ABLATION_CONFIG = STUDY_PATHS[MANUSCRIPT_STUDY]["config"]
 HORIZONS = (1, 7, 30, 90)
 SEEDS = (11, 22, 33, 44, 55)
 GRID = np.linspace(0.05, 1.0, 96)
@@ -91,7 +111,7 @@ def save(figure, path: Path) -> None:
         if temporary.exists():
             temporary.unlink()
     plt.close(figure)
-    print(f"  wrote {path.relative_to(ROOT)}")
+    print(f"  wrote {display_path(path)}")
 
 
 def mean_curve(horizon: int, key: str):
@@ -330,7 +350,7 @@ def curve_macros(out: Path) -> None:
     macro("curveSeedPairs", f"{len(table[table.horizon.eq(1)])}")
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    print(f"  wrote {out.relative_to(ROOT)}")
+    print(f"  wrote {display_path(out)}")
 
 
 def rolling_macros(out: Path, window: int) -> None:
@@ -385,10 +405,36 @@ def rolling_macros(out: Path, window: int) -> None:
         lines.append(rf"\newcommand{{\staticCoverageFloor}}{{{min(floors):.2f}}}")
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    print(f"  wrote {out.relative_to(ROOT)}")
+    print(f"  wrote {display_path(out)}")
 
 
-def main(outdir: Path) -> None:
+def display_path(path: Path) -> str:
+    """Repository-relative when possible, so a relative --outdir cannot abort a run."""
+    resolved = path.resolve()
+    if resolved.is_relative_to(ROOT):
+        return resolved.relative_to(ROOT).as_posix()
+    return resolved.as_posix()
+
+
+def select_study(study: str) -> None:
+    """Point every reader at one study's artifacts before any figure is drawn."""
+    global RELIABILITY_RAW, ABLATION_RAW, ABLATION_CONFIG
+    global CURVE_RAW, CURVE_STABILITY, CURVE_SHAPES
+    paths = STUDY_PATHS[study]
+    RELIABILITY_RAW = paths["reliability"]
+    ABLATION_RAW = paths["ablations"]
+    ABLATION_CONFIG = paths["config"]
+    suffix = "" if study == "v1" else f"_{study}"
+    interpretability = ROOT / "results" / "interpretability"
+    CURVE_RAW = interpretability / "raw" / f"cet_kan_curves{suffix}"
+    CURVE_STABILITY = (
+        interpretability / "aggregated" / f"cet_kan_curves{suffix}_stability.csv"
+    )
+    CURVE_SHAPES = interpretability / "aggregated" / f"cet_kan_curves{suffix}_shapes.csv"
+
+
+def main(outdir: Path, study: str = MANUSCRIPT_STUDY) -> None:
+    select_study(study)
     if not RELIABILITY_RAW.exists():
         raise SystemExit(f"missing {RELIABILITY_RAW.relative_to(ROOT)}")
     fingerprints = set()
@@ -431,11 +477,12 @@ def main(outdir: Path) -> None:
         + "\n",
         encoding="utf-8",
     )
-    print(f"  wrote {(outdir / 'figure_provenance.json').relative_to(ROOT)}")
+    print(f"  wrote {display_path(outdir / 'figure_provenance.json')}")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--outdir", default=str(ROOT / "paper" / "figures"))
+    parser.add_argument("--study", choices=sorted(STUDY_PATHS), default=MANUSCRIPT_STUDY)
     args = parser.parse_args()
-    main(Path(args.outdir))
+    main(Path(args.outdir), args.study)

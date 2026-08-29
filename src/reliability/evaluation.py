@@ -11,6 +11,7 @@ from src.reliability.calibration import (
     top_error_detection,
 )
 from src.reliability.fusion import (
+    choose_fusion_weights_on_calibration,
     choose_threshold_on_calibration,
     fuse_reliability,
     normalize_interval_width,
@@ -63,6 +64,7 @@ def evaluate_calibrated_reliability(
     quantile_levels,
     alpha=0.1,
     reliability_weights=(0.5, 0.5),
+    weight_selection="frozen",
     min_coverage=0.5,
     error_quantile=0.9,
 ):
@@ -126,12 +128,18 @@ def evaluate_calibrated_reliability(
     test_shift = mahalanobis_shift(reference_embeddings, test["embedding"])
     shift_rel_cal = percentile_to_reliability(cal_shift, cal_shift)
     shift_rel_test = percentile_to_reliability(test_shift, cal_shift)
-    fused_cal = fuse_reliability(
-        width_rel_cal, shift_rel_cal, weights=reliability_weights
-    )
-    fused_test = fuse_reliability(
-        width_rel_test, shift_rel_test, weights=reliability_weights
-    )
+    if weight_selection not in {"frozen", "calibration"}:
+        raise ValueError("weight_selection must be 'frozen' or 'calibration'")
+    if weight_selection == "calibration":
+        selection = choose_fusion_weights_on_calibration(
+            cal_target, cal_point, [width_rel_cal, shift_rel_cal]
+        )
+        fusion_weights = selection["weights"]
+    else:
+        selection = None
+        fusion_weights = tuple(float(w) for w in reliability_weights)
+    fused_cal = fuse_reliability(width_rel_cal, shift_rel_cal, weights=fusion_weights)
+    fused_test = fuse_reliability(width_rel_test, shift_rel_test, weights=fusion_weights)
 
     component_cal = {
         "fused": fused_cal,
@@ -231,6 +239,11 @@ def evaluate_calibrated_reliability(
         },
         "selective": selective,
         "reliability_diagnostics": associations,
+        "fusion": {
+            "weight_selection": weight_selection,
+            "weights": list(fusion_weights),
+            "selection_on_calibration": selection,
+        },
     }
     arrays = {
         "calibration_target": cal_target,
@@ -257,6 +270,7 @@ def evaluate_calibrated_reliability(
         },
     }
     calibration_state = {
+        "fusion_weights": list(fusion_weights),
         "marginal_radii_standardized": marginal_radii_std.tolist(),
         "simultaneous_radius_standardized": simultaneous_radius_std,
         "thresholds": {

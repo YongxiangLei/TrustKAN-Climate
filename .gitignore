@@ -24,6 +24,7 @@ results/prepared/
 results/reliability/
 results/ablations/
 results/extremes/
+results/extremes_v2/
 results/interpretability/
 results/robustness/
 results/splits/

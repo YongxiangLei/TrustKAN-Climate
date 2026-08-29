@@ -155,19 +155,30 @@ def training_sets(cfg, standardized, dates, split, horizon, expected_step):
     return {name: (x[mask], y[mask]) for name, mask in masks.items()}
 
 
-def main(config, *, horizons=None, seeds=None, device=None, resume=False):
+def main(
+    config,
+    *,
+    horizons=None,
+    seeds=None,
+    device=None,
+    resume=False,
+    model_name="trustkan",
+    ledger_path=None,
+    run_name=None,
+):
     cfg = load_config(config)
     cfg_hash = config_sha256(cfg)
     source_hash = code_sha256()
     data_hash = str(cfg["dataset"].get("sha256", "")).lower()
     resolved_device = resolve_device(device)
 
-    if not BENCHMARK_LEDGER.exists():
-        raise SystemExit(f"missing {BENCHMARK_LEDGER.relative_to(ROOT)}")
-    ledger = pd.read_csv(BENCHMARK_LEDGER)
-    reference = ledger[ledger.model.eq("trustkan") & ledger.status.eq("ok")]
+    ledger_path = Path(ledger_path) if ledger_path else BENCHMARK_LEDGER
+    if not ledger_path.exists():
+        raise SystemExit(f"missing {ledger_path.relative_to(ROOT)}")
+    ledger = pd.read_csv(ledger_path)
+    reference = ledger[ledger.model.eq(model_name) & ledger.status.eq("ok")]
     if reference.empty:
-        raise SystemExit("no successful TrustKAN runs in the benchmark ledger")
+        raise SystemExit(f"no successful {model_name} runs in {ledger_path.name}")
     expected_rmse = {
         (int(row.horizon), int(row.seed)): float(row.rmse)
         for row in reference.itertuples()
@@ -187,8 +198,9 @@ def main(config, *, horizons=None, seeds=None, device=None, resume=False):
     expected_step = pd.to_timedelta(cfg["dataset"]["frequency"]).to_timedelta64()
     grid = default_evaluation_grid()
 
-    raw_dir = ROOT / "results" / "interpretability" / "raw" / RUN_NAME
-    record_dir = ROOT / "results" / "interpretability" / "runs" / RUN_NAME
+    run_name = run_name or RUN_NAME
+    raw_dir = ROOT / "results" / "interpretability" / "raw" / run_name
+    record_dir = ROOT / "results" / "interpretability" / "runs" / run_name
     aggregated_dir = ROOT / "results" / "interpretability" / "aggregated"
     for directory in (raw_dir, record_dir, aggregated_dir):
         directory.mkdir(parents=True, exist_ok=True)
@@ -223,7 +235,7 @@ def main(config, *, horizons=None, seeds=None, device=None, resume=False):
             )
             row = {
                 "dataset": cfg["dataset"]["name"],
-                "model": "trustkan",
+                "model": model_name,
                 "horizon": int(horizon),
                 "seed": int(seed),
                 "status": "ok",
@@ -235,7 +247,7 @@ def main(config, *, horizons=None, seeds=None, device=None, resume=False):
                 **environment(resolved_device),
             }
             try:
-                model = build_model("trustkan", cfg["window"]["history"], horizon, seed)
+                model = build_model(model_name, cfg["window"]["history"], horizon, seed)
                 train_loader = loader(*sets["train"], cfg["training"]["batch_size"], True)
                 val_loader = loader(*sets["val"], cfg["training"]["batch_size"])
                 test_loader = loader(*sets["test"], cfg["training"]["batch_size"])
@@ -307,15 +319,15 @@ def main(config, *, horizons=None, seeds=None, device=None, resume=False):
             rows.append(row)
 
     frame = pd.DataFrame(rows)
-    frame.to_csv(aggregated_dir / f"{RUN_NAME}_runs.csv", index=False)
+    frame.to_csv(aggregated_dir / f"{run_name}_runs.csv", index=False)
     failed = frame[frame.status.ne("ok")]
     if not failed.empty:
         raise SystemExit(f"{len(failed)} curve extraction run(s) failed; see the ledger")
-    stability(raw_dir, aggregated_dir, run_horizons, run_seeds)
+    stability(raw_dir, aggregated_dir, run_horizons, run_seeds, run_name)
     return rows
 
 
-def stability(raw_dir: Path, aggregated_dir: Path, horizons, seeds) -> None:
+def stability(raw_dir: Path, aggregated_dir: Path, horizons, seeds, run_name=RUN_NAME) -> None:
     """Cross-seed agreement of the learned curves, index-matched and best-match."""
     records = []
     for horizon in horizons:
@@ -353,8 +365,8 @@ def stability(raw_dir: Path, aggregated_dir: Path, horizons, seeds) -> None:
         print("  no curve pairs available for stability analysis")
         return
     frame = pd.DataFrame(records)
-    frame.to_csv(aggregated_dir / f"{RUN_NAME}_stability.csv", index=False)
-    print(f"  wrote {(aggregated_dir / f'{RUN_NAME}_stability.csv').relative_to(ROOT)}")
+    frame.to_csv(aggregated_dir / f"{run_name}_stability.csv", index=False)
+    print(f"  wrote {(aggregated_dir / f'{run_name}_stability.csv').relative_to(ROOT)}")
 
 
 if __name__ == "__main__":
@@ -365,6 +377,21 @@ if __name__ == "__main__":
     parser.add_argument("--device", default=None)
     parser.add_argument("--resume", action="store_true")
     parser.add_argument(
+        "--model",
+        default="trustkan",
+        help="Benchmark model whose curves are extracted; must reproduce its ledger RMSE.",
+    )
+    parser.add_argument(
+        "--ledger",
+        default=None,
+        help="Benchmark ledger holding the RMSE the retrained model must reproduce.",
+    )
+    parser.add_argument(
+        "--run-name",
+        default=None,
+        help="Output namespace, so a second architecture does not overwrite the first.",
+    )
+    parser.add_argument(
         "--stability-only",
         action="store_true",
         help="Recompute cross-seed stability from existing curve artifacts.",
@@ -372,11 +399,13 @@ if __name__ == "__main__":
     args = parser.parse_args()
     if args.stability_only:
         cfg = load_config(args.config)
+        run_name = args.run_name or RUN_NAME
         stability(
-            ROOT / "results" / "interpretability" / "raw" / RUN_NAME,
+            ROOT / "results" / "interpretability" / "raw" / run_name,
             ROOT / "results" / "interpretability" / "aggregated",
             args.horizons or cfg["window"]["horizons"],
             args.seeds or cfg["training"]["seeds"],
+            run_name,
         )
     else:
         main(
@@ -385,4 +414,7 @@ if __name__ == "__main__":
             seeds=args.seeds,
             device=args.device,
             resume=args.resume,
+            model_name=args.model,
+            ledger_path=args.ledger,
+            run_name=args.run_name,
         )

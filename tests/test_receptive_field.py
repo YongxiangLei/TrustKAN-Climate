@@ -13,7 +13,8 @@ import pandas as pd
 import pytest
 import torch
 
-from scripts.analyze_robustness import receptive_fields
+import scripts.analyze_robustness as analyze
+from scripts.analyze_robustness import caption, receptive_fields
 from scripts.run_receptive_field import PROBE, code_sha256, receptive_field
 from src.models.trustkan import TrustKAN
 
@@ -43,8 +44,38 @@ def fields_frame(**overrides) -> pd.DataFrame:
 def write(tmp_path, frame, monkeypatch):
     path = tmp_path / "cet_receptive_fields.csv"
     frame.to_csv(path, index=False)
-    monkeypatch.setattr("scripts.analyze_robustness.FIELDS", path)
+    monkeypatch.setitem(analyze.STUDY, "fields", path)
     return path
+
+
+def grid_frame(block_costs) -> pd.DataFrame:
+    """A corruption grid whose 3-day and 7-day block cells are given per model."""
+    rows = []
+    for model, (three, seven) in block_costs.items():
+        rows.append(
+            {
+                "model": model,
+                "horizon": 1,
+                "model_seed": 11,
+                "kind": "clean",
+                "level": 0.0,
+                "rmse": 2.0,
+                "relative_increase": 0.0,
+            }
+        )
+        for level, value in ((3.0, three), (7.0, seven)):
+            rows.append(
+                {
+                    "model": model,
+                    "horizon": 1,
+                    "model_seed": 11,
+                    "kind": "block_missing",
+                    "level": level,
+                    "rmse": value,
+                    "relative_increase": value / 2.0 - 1.0,
+                }
+            )
+    return pd.DataFrame(rows)
 
 
 def test_reader_collapses_horizons_to_one_reach_per_model(tmp_path, monkeypatch):
@@ -69,9 +100,25 @@ def test_reader_refuses_runs_that_did_not_reproduce_the_ledger(tmp_path, monkeyp
 
 
 def test_reader_names_the_runner_when_the_measurement_is_absent(tmp_path, monkeypatch):
-    monkeypatch.setattr("scripts.analyze_robustness.FIELDS", tmp_path / "absent.csv")
+    monkeypatch.setitem(analyze.STUDY, "fields", tmp_path / "absent.csv")
     with pytest.raises(SystemExit, match="run_receptive_field"):
         receptive_fields()
+
+
+def test_caption_reports_saturation_only_when_the_sweep_shows_it(tmp_path, monkeypatch):
+    """The caption is a reading of the sweep, so it must be able to say either.
+
+    Asserting that the block cost stops growing was true of the published stem
+    and false of the corrected one; a caption that could only state the first
+    would misdescribe whichever study it was not written for.
+    """
+    write(tmp_path, fields_frame(), monkeypatch)
+    fields = receptive_fields()
+    saturating = grid_frame({"trustkan": (3.0, 3.0), "kan": (3.0, 3.4)})
+    text = caption(saturating, fields, ["trustkan", "kan"])
+    assert "stops growing past three days" in text
+    growing = grid_frame({"trustkan": (3.0, 3.5), "kan": (3.0, 3.4)})
+    assert "No model's cost saturates" in caption(growing, fields, ["trustkan", "kan"])
 
 
 def test_probe_sweeps_past_the_first_unreachable_step():

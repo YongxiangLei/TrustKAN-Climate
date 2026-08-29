@@ -214,6 +214,16 @@ def record_from_metrics(row, metrics, calibration_state):
     simultaneous = metrics["simultaneous_conformal"]
     fused = metrics["selective"]["fused"]
     diagnostics = metrics["reliability_diagnostics"]["fused"]
+    # The fusion weights decide whether the score is a real combination or one
+    # component wearing a different name, so they belong in the ledger rather
+    # than only inside the artifact's nested state.
+    fusion = metrics.get("fusion", {})
+    weights = fusion.get("weights") or []
+    row.update(
+        fusion_weight_selection=fusion.get("weight_selection"),
+        fusion_weight_width=weights[0] if len(weights) > 0 else None,
+        fusion_weight_shift=weights[1] if len(weights) > 1 else None,
+    )
     row.update(
         rmse=metrics["point"]["rmse"],
         mae=metrics["point"]["mae"],

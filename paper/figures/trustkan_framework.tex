@@ -1,11 +1,11 @@
 % Editable vector framework figure for TrustKAN-Climate.
 %
-% This diagram shows the design that was pre-registered and evaluated, not a
-% design that works. Components the ablations withdrew are drawn hatched and
-% labelled as such, so the figure cannot be read as a claim the results refute.
-% The encoder carries its measured reach for the same reason: a box labelled
-% only "temporal encoder" beside a year-long history would imply a span the
-% model does not have.
+% This diagram is the design that was evaluated after the two repairs: a
+% causal dilated stem whose reach is a closed-form property of its depth, an
+% attention readout, and a reliability fusion whose weight is selected on the
+% calibration partition. Components the evidence refutes --- the KAN layer's
+% interpretability, and the claim that the shift term earns fusion mass ---
+% are drawn hatched, so the figure cannot outrun the results.
 % The picture is scaled to \textwidth, so the readable size of a label is its
 % font size times that scale. Node widths set the natural width and therefore
 % the scale; a larger font only adds line wraps, making the boxes taller without
@@ -23,43 +23,44 @@
   faded/.style={arr, densely dashed, draw=black!35}
 ]
 \node[data] (data) {Climate / weather\\history $\mathbf{X}_t$\\[1pt]\scriptsize $\robustHistory$ steps};
-\node[model, right=of data] (temporal) {Temporal\\encoder $g_\theta$\\[1pt]\scriptsize reads last $\robustFieldTrust$};
-\node[model, gone, right=of temporal] (kan) {KAN functional\\representation};
-\node[model, right=of kan] (embed) {Embedding\\$\mathbf e_t$};
+\node[model, right=of data] (temporal) {Causal dilated\\stem $g_\theta$\\[1pt]\scriptsize reads $\robustFieldTrust$ of $\robustHistory$};
+\node[model, right=of temporal] (kan) {KAN functional\\representation};
+\node[model, right=of kan] (readout) {Attention\\readout};
+\node[model, right=of readout] (embed) {Embedding\\$\mathbf e_t$};
 
-\node[model, above right=8mm and 9mm of embed] (point) {Point head\\$\hat{\mathbf y}_t$};
+\node[model, above right=8mm and 4mm of embed] (point) {Point head\\$\hat{\mathbf y}_t$};
 \node[model, right=of embed] (quant) {Quantile head\\$\hat q^{(\tau)}$};
 \node[trust, right=of quant] (conf) {Static / rolling /\\adaptive conformal};
-\node[trust, gone, below right=8mm and 9mm of embed] (shift) {Representation\\shift $d_t$};
 
-\node[trust, right=15mm of conf] (width) {Interval-width\\reliability};
-\node[trust, gone, below=of width] (fusion) {Reliability fusion\\$r_t$};
-\node[decision, gone, right=of fusion] (gate) {Selective gate\\accept / abstain};
+\node[trust, below=of embed] (shift) {Representation\\shift $d_t$};
+\node[trust, right=of conf] (width) {Interval-width\\reliability};
+\node[trust, below=of width] (fusion) {Calibration-selected\\fusion $r_t$};
+\node[decision, right=of fusion] (gate) {Selective gate\\accept / abstain};
 \node[decision, right=of gate] (eval) {Risk--coverage\\decision support};
 
 \draw[arr] (data) -- (temporal);
 \draw[arr] (temporal) -- (kan);
-\draw[arr] (kan) -- (embed);
+\draw[arr] (kan) -- (readout);
+\draw[arr] (readout) -- (embed);
 \draw[arr] (embed) -- (point);
 \draw[arr] (embed) -- (quant);
 \draw[arr] (quant) -- (conf);
 \draw[arr] (conf) -- (width);
-\draw[faded] (embed) -- (shift);
+\draw[arr] (embed) -- (shift);
 \draw[arr] (width) -- (fusion);
-\draw[faded] (shift.east) -| (fusion.south);
+\draw[arr] (shift.east) -| (fusion.south);
 \draw[arr] (fusion) -- (gate);
 \draw[arr] (point.east) -| (gate.north);
 \draw[arr] (gate) -- (eval);
 
 \node[below=14mm of kan, align=center, text width=76mm, draw=black!45, densely dashed,
       rounded corners=2pt, fill=black!8, text=black!65, inner sep=4pt] (interp)
-  {\textbf{Interpretability analysis:} learned KAN edge functions over latent
-   channels; cross-seed and within-seed stability measured against controls};
+  {\textbf{Interpretability analysis:} univariate maps over latent channels;
+   index-matched, shuffled, and within-seed controls all refute stability};
 \draw[faded] (kan.south) -- (interp.north);
 
-\node[below=5mm of interp, align=center, text width=90mm] (legend)
-  {\tikz[baseline=-0.6ex]\node[draw=black!45, densely dashed, fill=black!8,
-     rounded corners=1pt, inner sep=2pt, minimum width=7mm, minimum height=3mm]{};\
-   withdrawn or refuted on its own pre-registered ablation;
-   solid components are those the evidence retains.};
+\node[below=5mm of interp, align=center, text width=100mm] (legend)
+  {Solid components are those under test. Hatched: the interpretability claim
+   is refuted; the shift term remains in the fusion and the data may withhold
+   mass from it, which is the point of selecting $\omega$ on calibration.};
 \end{tikzpicture}

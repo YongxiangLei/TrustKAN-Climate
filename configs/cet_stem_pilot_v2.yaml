@@ -1,0 +1,43 @@
+# Second pilot pass: wide receptive field plus a global attention readout.
+#
+# Everything except the model list is identical to cet_stem_pilot.yaml, which is
+# itself copied from the frozen cet.yaml, so the three pilot variants and the
+# published benchmark all share one protocol. This is a separate experiment name
+# rather than an extra entry in the first pilot's model list because the runner
+# keys resumption on the config hash, and editing that file would discard the
+# runs already completed.
+experiment:
+  name: cet_stem_pilot_v2
+
+dataset:
+  name: CET_Pershore_College
+  source: https://raw.githubusercontent.com/YongxiangLei/kan_proj/d4458e8fb11883b2eec0994aaaa6b7914e7f9e60/cet_mean_station_series.csv
+  date_column: date
+  target_column: Pershore_College
+  frequency: 1D
+  min_valid_temperature: -20.0
+  sha256: c54a9da8a66e71368ebf1dde70d8f6d8110d63bb15d39969e34568f5089048f7
+
+window:
+  history: 365
+  horizons: [1, 7, 30, 90]
+
+split:
+  train: 0.60
+  validation: 0.15
+  calibration: 0.10
+  test: 0.15
+
+training:
+  seeds: [11, 22, 33, 44, 55]
+  batch_size: 64
+  epochs: 100
+  patience: 10
+  learning_rate: 0.001
+  optimizer: adamw
+  weight_decay: 0.01
+  deterministic_algorithms: true
+  deterministic_warn_only: false
+
+models:
+  - trustkan_v2

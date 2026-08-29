@@ -1,0 +1,57 @@
+# Unified neural benchmark for the v2 study.
+#
+# The paired test requires both artifacts of a pair to carry the same config and
+# code fingerprints, and changing the model source necessarily changes the code
+# fingerprint. Re-running the comparators here rather than relaxing that guard
+# also produces the evidence that the change was inert for them: each baseline
+# must reproduce its frozen RMSE, since the edits only added a stem option, a
+# readout option, and two model names.
+#
+# Dataset, window, split, and training settings are copied verbatim from
+# cet.yaml. The classical baselines are omitted because they cost about twenty
+# hours and are not competitive at the horizons the comparison turns on; the
+# full table needs them before publication.
+experiment:
+  name: cet_v2_neural
+
+dataset:
+  name: CET_Pershore_College
+  source: https://raw.githubusercontent.com/YongxiangLei/kan_proj/d4458e8fb11883b2eec0994aaaa6b7914e7f9e60/cet_mean_station_series.csv
+  date_column: date
+  target_column: Pershore_College
+  frequency: 1D
+  min_valid_temperature: -20.0
+  sha256: c54a9da8a66e71368ebf1dde70d8f6d8110d63bb15d39969e34568f5089048f7
+
+window:
+  history: 365
+  horizons: [1, 7, 30, 90]
+
+split:
+  train: 0.60
+  validation: 0.15
+  calibration: 0.10
+  test: 0.15
+
+training:
+  seeds: [11, 22, 33, 44, 55]
+  batch_size: 64
+  epochs: 100
+  patience: 10
+  learning_rate: 0.001
+  optimizer: adamw
+  weight_decay: 0.01
+  deterministic_algorithms: true
+  deterministic_warn_only: false
+
+models:
+  - persistence
+  - mlp
+  - lstm
+  - gru
+  - tcn
+  - transformer
+  - kan
+  - trustkan
+  - trustkan_dilated
+  - trustkan_v2

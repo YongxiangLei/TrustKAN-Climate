@@ -42,7 +42,19 @@ from src.models.trustkan import TrustKAN
 from src.training.engine import predict, resolve_device, set_seed, train_regressor
 
 
-NEURAL = {"mlp", "lstm", "gru", "transformer", "tcn", "mamba", "kan", "tem2kan", "trustkan"}
+NEURAL = {
+    "mlp",
+    "lstm",
+    "gru",
+    "transformer",
+    "tcn",
+    "mamba",
+    "kan",
+    "tem2kan",
+    "trustkan",
+    "trustkan_dilated",
+    "trustkan_v2",
+}
 CLASSICAL = {"svr", "random_forest", "xgboost"}
 DETERMINISTIC = {"persistence", "svr"}
 RUN_NAME = re.compile(r"^[A-Za-z0-9._-]+$")
@@ -151,6 +163,29 @@ def build_model(name, history, horizon, seed=None, options=None, n_features=1):
         return Tem2KANReference(history, 1, horizon, seed=1 if seed is None else seed)
     if name == "trustkan":
         return TrustKAN(n_features, horizon=horizon, hidden_dim=64, grid_size=8)
+    if name == "trustkan_dilated":
+        # Same model with a stem whose receptive field covers the history; the
+        # local stem reaches only the final three steps of it.
+        return TrustKAN(
+            n_features,
+            horizon=horizon,
+            hidden_dim=64,
+            grid_size=8,
+            stem="dilated",
+            history=history,
+        )
+    if name == "trustkan_v2":
+        # Wide receptive field plus a global readout, so a year of context does
+        # not have to reach the head through the final state alone.
+        return TrustKAN(
+            n_features,
+            horizon=horizon,
+            hidden_dim=64,
+            grid_size=8,
+            stem="dilated",
+            history=history,
+            readout="attention",
+        )
     if name == "svr":
         return make_svr(**options)
     if name == "random_forest":

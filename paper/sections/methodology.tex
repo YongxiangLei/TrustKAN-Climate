@@ -17,7 +17,7 @@ The input sequence is first transformed by a temporal encoder $g_{\theta}$,
 \begin{equation}
 \mathbf{Z}_t=g_{\theta}(\mathbf{X}_t),
 \end{equation}
-where the current implementation uses one-dimensional temporal convolutions to capture local lag structure. Each hidden vector $\mathbf{z}\in\mathbb{R}^{m}$ is then processed by a KAN-style mapping
+built from one-dimensional temporal convolutions. Section~\ref{sec:stem} states the stem in full; what matters for the KAN mapping is that $\mathbf{Z}_t\in\mathbb{R}^{L\times m}$ retains one hidden vector per input step. Each hidden vector $\mathbf{z}\in\mathbb{R}^{m}$ is then processed by a KAN-style mapping
 \begin{equation}
  h_k(\mathbf{z})=b_k(\mathbf{z})+\sum_{j=1}^{m}\phi_{kj}(z_j),
  \label{eq:kanmap}
@@ -28,16 +28,43 @@ where $b_k$ denotes a learnable base mapping and $\phi_{kj}$ is a learnable univ
 \end{equation}
 with grid centers $\mu_g$, coefficients $c_{kjg}$, and positive scales $\sigma_{jg}$. This functional decomposition is motivated by the interpretable edge-function view of KANs \cite{liu2025kan}.
 
-The resulting temporal representation is reduced to an embedding $\mathbf{e}_t\in\mathbb{R}^{m}$ by taking the final encoder state, matching the recurrent and attention baselines. An earlier implementation averaged the states over the whole window instead; Section~\ref{sec:correction} reports that defect and its correction. This embedding feeds the forecasting heads and also provides a representation space for shift assessment.
+\subsection{Full-History Causal Stem}
+\label{sec:stem}
+A stem of stacked kernel-3 convolutions with symmetric padding has a receptive field that grows by two steps per layer, and at the final position half of each kernel falls on right padding, so two such layers let the last state depend on three input steps whatever $L$ is. A configured look-back is then not an effective one, and the discrepancy is invisible in both the equations and the loss curves. We therefore build the stem so that its reach is a stated property of the construction.
 
-Two consequences of this stem are worth stating here, because both are measured later and neither is visible in the equations. Composing two kernel-3 convolutions with a final-state readout bounds how far back $\mathbf{e}_t$ can depend on $\mathbf{X}_t$, and Section~\ref{sec:results_receptive} measures that bound at $\robustFieldTrust{}$ of the $\robustHistory{}$ available steps. The $\phi_{kj}$ of \eqref{eq:kanmap} are therefore univariate functions of learned latent channels computed from that short window, not of observed variables over the look-back period, which constrains what any reading of them can mean.
+Let $\mathbf{z}^{(0)}=\sigma(\mathbf{W}_{\mathrm{e}}\ast_1\mathbf{X}_t)$ be a pointwise embedding of the input to $m$ channels, with $\sigma$ the GELU nonlinearity and $\ast_k$ a convolution of kernel size $k$. For $\ell=1,\ldots,D$ we apply a depthwise kernel-3 convolution of dilation $2^{\ell-1}$, padded on the left only, in a residual branch,
+\begin{equation}
+\mathbf{z}^{(\ell)}=\mathbf{z}^{(\ell-1)}+\sigma\!\left(\mathbf{W}^{(\ell)}\ast_{3}^{\,2^{\ell-1}}\mathbf{z}^{(\ell-1)}\right),
+\label{eq:dilated}
+\end{equation}
+and close with a pointwise mixer, $\mathbf{Z}_t=\sigma(\mathbf{W}_{\mathrm{m}}\ast_1\mathbf{z}^{(D)})$. Left-only padding makes every output position a function of its own past exclusively, so the stem is causal by construction and no look-ahead can enter through the boundary. The receptive field of the stack is
+\begin{equation}
+R(D)=1+\textstyle\sum_{\ell=1}^{D}2\cdot 2^{\ell-1}=2^{D+1}-1,
+\label{eq:field}
+\end{equation}
+so setting $D=\lceil\log_2\!\big((L+1)/2\big)\rceil$ guarantees $R(D)\geq L$. For the $L=365$ used throughout, $D=8$ and $R=511$: the final state can depend on every day in the window. Because the dilated convolutions are depthwise and mixing is confined to two pointwise layers, the stack costs fewer parameters than the two dense convolutions it replaces, so widening the reach does not widen the model. This matters for the ablations: a comparison against a plain KAN of matched budget stays a comparison of inductive bias rather than of capacity.
 
-Figure~\ref{fig:framework} shows the full framework as it was pre-registered and evaluated. We draw it here rather than after the results so that the design under test is stated before its assessment, and we mark on it the components that Section~\ref{sec:results} withdraws, so that no reader takes the diagram for a working system.
+\subsection{Attention Readout}
+\label{sec:readout}
+The temporal representation is reduced to an embedding $\mathbf{e}_t\in\mathbb{R}^{m}$ that feeds the forecasting heads and provides the space in which shift is assessed. Taking the final encoder state matches the convention of the recurrent and attention baselines, but it routes a year of context through one $m$-vector, whereas a flattened-lag baseline reads every lag through its own weight. We therefore aggregate over the window as well, with a learned query $\mathbf{q}\in\mathbb{R}^{m}$,
+\begin{equation}
+a_{t,s}=\frac{\exp\!\big(\mathbf{z}_{t,s}^{\top}\mathbf{q}/\sqrt{m}\big)}{\sum_{s'}\exp\!\big(\mathbf{z}_{t,s'}^{\top}\mathbf{q}/\sqrt{m}\big)},\qquad
+\mathbf{c}_t=\sum_{s=1}^{L}a_{t,s}\,\mathbf{z}_{t,s},
+\label{eq:attention}
+\end{equation}
+and combine the two views through a learned projection,
+\begin{equation}
+\mathbf{e}_t=\mathbf{W}_{\mathrm{r}}\left[\mathbf{z}_{t,L};\,\mathbf{c}_t\right].
+\label{eq:readout}
+\end{equation}
+Keeping $\mathbf{z}_{t,L}$ in the concatenation preserves the recency that dominates short-horizon temperature forecasting, while $\mathbf{c}_t$ supplies the seasonal context that dominates at long lead times; Section~\ref{sec:results_ablation} charges each of \eqref{eq:dilated} and \eqref{eq:readout} for its own contribution rather than crediting the pair. The weights $a_{t,s}$ are a distribution over time, so the aggregation is itself inspectable.
+
+Figure~\ref{fig:framework} shows the framework as evaluated. We draw it before the results so that the design under test is stated before its assessment.
 
 \begin{figure*}[t]
 \centering
 \resizebox{\textwidth}{!}{\input{figures/trustkan_framework.tex}}
-\caption{The \method{} framework as pre-registered: a temporal encoder feeding a KAN functional layer, joint point and quantile heads, conformal calibration, a representation-shift score, their fusion into a reliability score, and a selective gate. Hatched components are those the pre-specified ablations withdraw or refute (Sections~\ref{sec:results_ablation} and \ref{sec:results_interpretability}); what remains solid is the conformal wrapper and the interval-width score. The encoder is annotated with the reach measured in Section~\ref{sec:results_receptive}, which is the number of trailing timesteps that can influence $\mathbf{e}_t$.}
+\caption{The \method{} framework as evaluated: a causal dilated stem feeding a KAN functional layer, an attention readout, joint point and quantile heads, conformal calibration in both its marginal and simultaneous forms, a representation-shift score, their fusion under calibration-selected weights, and a selective gate. The encoder is annotated with the reach measured in Section~\ref{sec:results_receptive}, which is the number of trailing timesteps that can influence $\mathbf{e}_t$.}
 \label{fig:framework}
 \end{figure*}
 
@@ -103,7 +130,14 @@ The framework uses two default evidence components: an interval-width score and 
 r_t=\left(r_{t}^{\mathrm{width}}\right)^{\omega}\left(r_{t}^{\mathrm{shift}}\right)^{1-\omega},\qquad 0\leq\omega\leq1,
 \label{eq:fusion}
 \end{equation}
-which was chosen over an arithmetic combination so that a low value in either component pulls the fused score down rather than being averaged away. The weight was frozen at $\omega=1/2$ in advance rather than fitted; Section~\ref{sec:discussion} argues that freezing an arbitrary constant is weaker discipline than freezing a validation-based procedure for choosing it, and that this particular choice is what makes the fusion worse than its own best input. The decision threshold, by contrast, is selected on calibration data. Importantly, Eq.~\eqref{eq:fusion} is treated as a testable design choice: ablation experiments must show that fusion adds value beyond either component alone.
+which was chosen over an arithmetic combination so that a low value in either component pulls the fused score down rather than being averaged away.
+
+The weight $\omega$ is the part of this construction that decides whether fusion helps or hurts, and fixing it at $\omega=1/2$ in advance is not the conservative choice it appears to be. A component that is uninformative, or whose association with error reverses at long lead times, still carries half the score, and the fused score can then rank forecasts worse than its better input does alone. Freezing an arbitrary constant is therefore weaker discipline than freezing a procedure for choosing it. We freeze the latter: $\omega$ is selected on the calibration partition by minimizing the area under the risk--coverage curve,
+\begin{equation}
+\hat{\omega}=\arg\min_{\omega\in\Omega}\;\mathrm{AURC}\!\left(\{r_t(\omega)\}_{t\in\mathcal{I}_{\mathrm{cal}}}\right),
+\label{eq:weightselect}
+\end{equation}
+over a uniform grid $\Omega=\{0,\tfrac{1}{G-1},\ldots,1\}$ whose endpoints are the two single-component scores. Two properties follow. The selected fusion is no worse on the calibration split than its best single component, because both components are themselves candidates in $\Omega$, so the mechanism cannot degrade a signal that works. And the data may withhold mass from a component that does not earn it, up to withholding all of it, which turns the fusion from an assumption into a measurement. Only calibration targets and predictions enter \eqref{eq:weightselect}, so no test label informs the choice; the selected $\hat{\omega}$ and the calibration curve behind it are recorded in each run's ledger row. The decision threshold is selected on the same partition. Section~\ref{sec:results_selective} reports what the selection concluded and what it bought.
 
 \subsection{Reliability--Error Validation}
 A reliability score is useful only if it is informative about realized error. For each sample, define an aggregate forecast error
