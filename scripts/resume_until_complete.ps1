@@ -38,9 +38,35 @@ while ($attempt -lt $MaxAttempts) {
         break
     }
     Write-Output "attempt $attempt : $before/$Expected records, resuming"
-    $argLine = "--config `"$Config`" --device cuda --resume"
-    if ($ExtraArgs) { $argLine += " $ExtraArgs" }
-    cmd.exe /c "`"$python`" $Runner $argLine >nul 2>&1" | Out-Null
+    New-Item -ItemType Directory -Force -Path $RecordDir | Out-Null
+    $log = Join-Path $RecordDir "_resume.log"
+    Remove-Item $log, "$log.err" -ErrorAction SilentlyContinue
+    $argList = @($Runner, "--config", $Config, "--device", "cuda", "--resume")
+    if ($ExtraArgs) {
+        $argList += $ExtraArgs.Split(" ", [System.StringSplitOptions]::RemoveEmptyEntries)
+    }
+    # Launch as a child we can kill. A cuDNN teardown sometimes hangs instead of
+    # exiting, which left the previous loop waiting overnight with the GPU idle.
+    $proc = Start-Process -FilePath $python -ArgumentList $argList -PassThru -WindowStyle Hidden `
+        -RedirectStandardOutput $log -RedirectStandardError "$log.err"
+    $lastCount = $before
+    $lastProgress = Get-Date
+    $idleMinutes = 40
+    while (-not $proc.HasExited) {
+        Start-Sleep -Seconds 30
+        $now = Get-RecordCount
+        if ($now -gt $lastCount) {
+            $lastCount = $now
+            $lastProgress = Get-Date
+            Write-Output ("  progress $now/$Expected")
+            if ($now -ge $Expected) { break }
+        }
+        elseif (((Get-Date) - $lastProgress).TotalMinutes -ge $idleMinutes) {
+            Write-Output "WATCHDOG: no new record for $idleMinutes min; killing hung runner pid=$($proc.Id)"
+            Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+            break
+        }
+    }
     $after = Get-RecordCount
     Write-Output "attempt $attempt : $before -> $after"
     if ($after -le $before) {
